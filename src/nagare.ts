@@ -1,6 +1,5 @@
 import type { Disposable, Subscription, ErrorHandler } from './types';
 import { loadWasm, wasmModule } from './wasm-loader';
-import { TurboAcceleration } from './turbo-acceleration';
 
 export class Nagare<T, E = never> implements AsyncIterable<T> {
   protected source: AsyncIterable<T> | Iterable<T> | ReadableStream<T>;
@@ -413,44 +412,60 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   }
 
   async toArray(): Promise<T[]> {
-    // 🚀 Turbo Acceleration - Techniques impossible with vanilla JavaScript!
-    if (this._originalArraySource && this._originalArraySource.length >= 1000) {
-      
-      // Pattern 1: Map+Filter with 8-way vectorization
-      if (this.operators.length === 2 && typeof this._originalArraySource[0] === 'number') {
-        console.log('🚀 Using Turbo map+filter (8-way vectorization)');
-        const result = TurboAcceleration.turboMapFilter(this._originalArraySource as number[]);
+    // Operator Fusion: Compile operator chain into single optimized function
+    if (Array.isArray(this.source) && this.operators.length > 0) {
+      try {
+        // Compile operators into fused function
+        const fusedOperator = this.compileOperatorChain();
+        if (!fusedOperator) throw new Error('compilation-failed');
+        
+        // Execute fused operation - single pass through data
+        const result: T[] = [];
+        for (let i = 0; i < this.source.length; i++) {
+          const processed = fusedOperator(this.source[i]);
+          if (processed !== undefined) {
+            result.push(processed);
+          }
+        }
+        
         return result as T[];
-      }
-      
-      // Pattern 2: Complex pipeline with state fusion
-      if (this.operators.length === 5 && typeof this._originalArraySource[0] === 'number') {
-        console.log('🚀 Using Turbo complex pipeline (inline expansion)');
-        const result = TurboAcceleration.turboComplexPipeline(this._originalArraySource as number[]);
-        return result as T[];
-      }
-      
-      // Pattern 3: Object processing with SoA transformation
-      if (this.operators.length === 4 && typeof this._originalArraySource[0] === 'object') {
-        console.log('🚀 Using Turbo object processing (SoA optimization)');
-        const result = TurboAcceleration.turboObjectProcessing(this._originalArraySource);
-        return result as T[];
-      }
-      
-      // Pattern 4: Large dataset with parallel processing
-      if (this._originalArraySource.length >= 100000 && typeof this._originalArraySource[0] === 'number') {
-        console.log('🚀 Using Turbo parallel processing');
-        const result = await TurboAcceleration.turboLargeDataset(this._originalArraySource as number[]);
-        return result as T[];
+      } catch (error) {
+        // Fall back to standard iteration
       }
     }
 
-    // Standard path for everything else
+    // Standard async iteration
     const result: T[] = [];
     for await (const value of this) {
       result.push(value);
     }
     return result;
+  }
+
+  // Compile operator chain into single optimized function
+  private compileOperatorChain(): ((value: any) => any) | null {
+    try {
+      // Test all operators with a sample value to ensure they're sync
+      const testValue = Array.isArray(this.source) ? this.source[0] : null;
+      if (testValue === null || testValue === undefined) return null;
+      
+      for (const op of this.operators) {
+        const result = op(testValue);
+        if (result instanceof Promise) return null;
+      }
+      
+      // Create fused function that applies all operators in sequence
+      return (value: any) => {
+        let current = value;
+        for (const op of this.operators) {
+          current = op(current);
+          if (current === undefined) return undefined;
+        }
+        return current;
+      };
+    } catch (error) {
+      return null;
+    }
   }
 
   async first(): Promise<T | undefined> {
