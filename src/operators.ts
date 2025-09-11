@@ -1,14 +1,14 @@
-import { River } from './river';
+import { Nagare } from './nagare';
 import { ensureWasmLoaded, wasmModule } from './wasm-loader';
 
 export function debounce<T>(ms: number) {
-  return (river: River<T>): River<T> => {
+  return (nagare: Nagare<T>): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
       let timeout: NodeJS.Timeout | null = null;
       let lastValue: T | undefined;
       let hasValue = false;
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         lastValue = value;
         hasValue = true;
 
@@ -31,16 +31,16 @@ export function debounce<T>(ms: number) {
         yield lastValue;
       }
     };
-    return new River<T>(generator());
+    return new Nagare<T>(generator());
   };
 }
 
 export function throttle<T>(ms: number) {
-  return (river: River<T>): River<T> => {
+  return (nagare: Nagare<T>): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
       let lastEmit = 0;
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         const now = Date.now();
         if (now - lastEmit >= ms) {
           yield value;
@@ -48,16 +48,16 @@ export function throttle<T>(ms: number) {
         }
       }
     };
-    return new River<T>(generator());
+    return new Nagare<T>(generator());
   };
 }
 
 export function buffer<T>(size: number) {
-  return (river: River<T>): River<T[]> => {
+  return (nagare: Nagare<T>): Nagare<T[]> => {
     const generator = async function* (): AsyncGenerator<T[]> {
       let buffer: T[] = [];
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         buffer.push(value);
         
         if (buffer.length >= size) {
@@ -70,12 +70,12 @@ export function buffer<T>(size: number) {
         yield buffer;
       }
     };
-    return new River<T[]>(generator());
+    return new Nagare<T[]>(generator());
   };
 }
 
 export function bufferTime<T>(ms: number) {
-  return (river: River<T>): River<T[]> => {
+  return (nagare: Nagare<T>): Nagare<T[]> => {
     const generator = async function* (): AsyncGenerator<T[]> {
       let buffer: T[] = [];
       let timeout: NodeJS.Timeout | null = null;
@@ -89,7 +89,7 @@ export function bufferTime<T>(ms: number) {
         return null;
       };
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         buffer.push(value);
 
         if (!timeout) {
@@ -110,15 +110,15 @@ export function bufferTime<T>(ms: number) {
       const remaining = flush();
       if (remaining) yield remaining;
     };
-    return new River<T[]>(generator());
+    return new Nagare<T[]>(generator());
   };
 }
 
 export function distinct<T>() {
-  return (river: River<T>): River<T> => {
+  return (nagare: Nagare<T>): Nagare<T> => {
     const seen = new Set<T>();
     
-    return river.filter((value) => {
+    return nagare.filter((value) => {
       if (seen.has(value)) {
         return false;
       }
@@ -129,28 +129,28 @@ export function distinct<T>() {
 }
 
 export function distinctUntilChanged<T>() {
-  return (river: River<T>): River<T> => {
+  return (nagare: Nagare<T>): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
       let previous: T | symbol = Symbol('initial');
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         if (previous === Symbol('initial') || value !== previous) {
           yield value;
           previous = value;
         }
       }
     };
-    return new River<T>(generator());
+    return new Nagare<T>(generator());
   };
 }
 
 export function pairwise<T>() {
-  return (river: River<T>): River<[T, T]> => {
+  return (nagare: Nagare<T>): Nagare<[T, T]> => {
     const generator = async function* (): AsyncGenerator<[T, T]> {
       let previous: T | undefined;
       let hasPrevious = false;
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         if (hasPrevious) {
           yield [previous!, value];
         }
@@ -158,52 +158,52 @@ export function pairwise<T>() {
         hasPrevious = true;
       }
     };
-    return new River<[T, T]>(generator());
+    return new Nagare<[T, T]>(generator());
   };
 }
 
 export function startWith<T>(...values: T[]) {
-  return (river: River<T>): River<T> => {
+  return (nagare: Nagare<T>): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
       for (const value of values) {
         yield value;
       }
-      yield* river;
+      yield* nagare;
     };
-    return new River<T>(generator());
+    return new Nagare<T>(generator());
   };
 }
 
 export function concatMap<T, U>(
-  fn: (value: T) => River<U> | Promise<River<U>>
+  fn: (value: T) => Nagare<U> | Promise<Nagare<U>>
 ) {
-  return (river: River<T>): River<U> => {
+  return (nagare: Nagare<T>): Nagare<U> => {
     const generator = async function* (): AsyncGenerator<U> {
-      for await (const value of river) {
-        const innerRiver = await fn(value);
-        yield* innerRiver;
+      for await (const value of nagare) {
+        const innerNagare = await fn(value);
+        yield* innerNagare;
       }
     };
-    return new River<U>(generator());
+    return new Nagare<U>(generator());
   };
 }
 
 export function switchMap<T, U>(
-  fn: (value: T) => River<U> | Promise<River<U>>
+  fn: (value: T) => Nagare<U> | Promise<Nagare<U>>
 ) {
-  return (river: River<T>): River<U> => {
+  return (nagare: Nagare<T>): Nagare<U> => {
     const generator = async function* (): AsyncGenerator<U> {
       let currentIterator: AsyncIterator<U> | null = null;
       let abortController: AbortController | null = null;
 
-      for await (const value of river) {
+      for await (const value of nagare) {
         if (abortController) {
           abortController.abort();
         }
         
         abortController = new AbortController();
-        const innerRiver = await fn(value);
-        currentIterator = innerRiver[Symbol.asyncIterator]();
+        const innerNagare = await fn(value);
+        currentIterator = innerNagare[Symbol.asyncIterator]();
 
         let done = false;
         while (!done && !abortController.signal.aborted) {
@@ -215,14 +215,14 @@ export function switchMap<T, U>(
         }
       }
     };
-    return new River<U>(generator());
+    return new Nagare<U>(generator());
   };
 }
 
 export function retry<T>(maxRetries = 3, delayMs = 1000) {
-  return (river: River<T>): River<T> => {
+  return (nagare: Nagare<T>): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
-      for await (const value of river) {
+      for await (const value of nagare) {
         let retries = 0;
         let lastError: any;
 
@@ -244,7 +244,7 @@ export function retry<T>(maxRetries = 3, delayMs = 1000) {
         }
       }
     };
-    return new River<T>(generator());
+    return new Nagare<T>(generator());
   };
 }
 
@@ -269,8 +269,8 @@ export async function simdMapMulAdd(
     throw new Error('WASM module not loaded');
   }
   
-  const river = wasmModule.NagareRiver.fromTypedArray(data);
-  const result = river.mapWasm('f32x_map_mul_add', { a, b });
+  const nagare = wasmModule.NagareNagare.fromTypedArray(data);
+  const result = nagare.mapWasm('f32x_map_mul_add', { a, b });
   
   return new Float32Array(await result.toArray());
 }

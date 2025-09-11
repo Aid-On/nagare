@@ -1,26 +1,26 @@
-import { River } from './river';
+import { Nagare } from './nagare';
 
-export function createFromArray<T>(array: T[]): River<T> {
-  return new River<T>(array);
+export function createFromArray<T>(array: T[]): Nagare<T> {
+  return new Nagare<T>(array);
 }
 
-export function createFromReadableStream<T>(stream: ReadableStream<T>): River<T> {
-  return River.fromReadableStream(stream);
+export function createFromReadableStream<T>(stream: ReadableStream<T>): Nagare<T> {
+  return Nagare.fromReadableStream(stream);
 }
 
-export function createFromPromise<T>(promise: Promise<T>): River<T> {
-  return River.from(promise);
+export function createFromPromise<T>(promise: Promise<T>): Nagare<T> {
+  return Nagare.from(promise);
 }
 
-export function createFromAsyncIterable<T>(iterable: AsyncIterable<T>): River<T> {
-  return new River<T>(iterable);
+export function createFromAsyncIterable<T>(iterable: AsyncIterable<T>): Nagare<T> {
+  return new Nagare<T>(iterable);
 }
 
-export function createFromIterable<T>(iterable: Iterable<T>): River<T> {
-  return new River<T>(iterable);
+export function createFromIterable<T>(iterable: Iterable<T>): Nagare<T> {
+  return new Nagare<T>(iterable);
 }
 
-export function createInterval(ms: number, signal?: AbortSignal): River<number> {
+export function createInterval(ms: number, signal?: AbortSignal): Nagare<number> {
   const generator = async function* (): AsyncGenerator<number> {
     let count = 0;
     while (!signal?.aborted) {
@@ -28,22 +28,22 @@ export function createInterval(ms: number, signal?: AbortSignal): River<number> 
       await new Promise(resolve => setTimeout(resolve, ms));
     }
   };
-  return new River<number>(generator());
+  return new Nagare<number>(generator());
 }
 
-export function createRange(start: number, end: number, step = 1): River<number> {
+export function createRange(start: number, end: number, step = 1): Nagare<number> {
   const generator = function* (): Generator<number> {
     for (let i = start; i < end; i += step) {
       yield i;
     }
   };
-  return new River<number>(generator());
+  return new Nagare<number>(generator());
 }
 
 export function createFromEventSource(
   eventSource: EventSource,
   eventName = 'message'
-): River<MessageEvent> {
+): Nagare<MessageEvent> {
   const generator = async function* (): AsyncGenerator<MessageEvent> {
     const queue: MessageEvent[] = [];
     let resolve: ((value: { done: false; value: MessageEvent } | { done: true }) => void) | null = null;
@@ -93,13 +93,13 @@ export function createFromEventSource(
       eventSource.removeEventListener('error', errorHandler);
     }
   };
-  return new River<MessageEvent>(generator());
+  return new Nagare<MessageEvent>(generator());
 }
 
 export function createFromWebSocket(
   socket: WebSocket,
   options?: { binary?: boolean }
-): River<MessageEvent> {
+): Nagare<MessageEvent> {
   const generator = async function* (): AsyncGenerator<MessageEvent> {
     const queue: MessageEvent[] = [];
     let resolve: ((value: { done: false; value: MessageEvent } | { done: true }) => void) | null = null;
@@ -155,13 +155,13 @@ export function createFromWebSocket(
       socket.removeEventListener('error', closeHandler);
     }
   };
-  return new River<MessageEvent>(generator());
+  return new Nagare<MessageEvent>(generator());
 }
 
 export function createFromFetch(
   url: string | URL,
   options?: RequestInit & { pollInterval?: number }
-): River<Response> {
+): Nagare<Response> {
   const generator = async function* (): AsyncGenerator<Response> {
     if (options?.pollInterval) {
       while (true) {
@@ -179,11 +179,11 @@ export function createFromFetch(
       yield response;
     }
   };
-  return new River<Response>(generator());
+  return new Nagare<Response>(generator());
 }
 
 export function createFromGenerator<T>(
   generator: () => Generator<T> | AsyncGenerator<T>
-): River<T> {
-  return new River<T>(generator());
+): Nagare<T> {
+  return new Nagare<T>(generator());
 }

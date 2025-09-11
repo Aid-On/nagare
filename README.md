@@ -16,7 +16,7 @@
 ---
 
 > **nagare** (流れ) - "flow" in Japanese  
-> *Like a river carving its path through mountains, Nagare guides your data streams with grace and power*
+> *Like a nagare carving its path through mountains, Nagare guides your data streams with grace and power*
 
 Nagare is a next-generation stream processing library that delivers **5-10x performance** improvements over traditional JavaScript stream libraries. Built with Rust/WASM for compute-heavy workloads, SIMD acceleration, and designed specifically for edge computing environments like Cloudflare Workers.
 
@@ -75,10 +75,10 @@ pnpm add @aid-on/nagare
 ### Basic Stream Processing
 
 ```typescript
-import { River } from '@aid-on/nagare';
+import { Nagare } from '@aid-on/nagare';
 
 // Create and transform a stream
-const stream = River.from([1, 2, 3, 4, 5])
+const stream = Nagare.from([1, 2, 3, 4, 5])
   .map(x => x * 2)
   .filter(x => x > 5)
   .scan((acc, x) => acc + x, 0);
@@ -99,7 +99,7 @@ using subscription = stream.observe(
 // Process large Float32Arrays with SIMD
 const audioData = new Float32Array(1_000_000);
 
-const processed = await River
+const processed = await Nagare
   .from([audioData])
   .mapWasm('fft_transform')      // Fast Fourier Transform
   .mapWasm('noise_reduction')    // SIMD noise reduction
@@ -127,16 +127,16 @@ wsStream
 
 ## 🎨 Core Concepts
 
-### The River Type
+### The Nagare Type
 
-`River<T, E>` is the core abstraction - a lazy, composable stream that can be transformed, merged, and observed.
+`Nagare<T, E>` is the core abstraction - a lazy, composable stream that can be transformed, merged, and observed.
 
 ```typescript
-// Multiple ways to create rivers
-const fromArray = River.from([1, 2, 3]);
-const fromPromise = River.from(Promise.resolve(42));
-const fromInterval = river.interval(1000);
-const fromWebStream = River.fromReadableStream(stream);
+// Multiple ways to create nagares
+const fromArray = Nagare.from([1, 2, 3]);
+const fromPromise = Nagare.from(Promise.resolve(42));
+const fromInterval = nagare.interval(1000);
+const fromWebStream = Nagare.fromReadableStream(stream);
 
 // Chainable operators
 const pipeline = source
@@ -171,7 +171,7 @@ const adaptive = new AdaptiveBackpressure({
 ### Error Recovery
 
 ```typescript
-const resilient = river
+const resilient = nagare
   .map(riskyOperation)
   .rescue(error => {
     logger.error('Operation failed:', error);
@@ -187,11 +187,11 @@ const resilient = river
 
 ```typescript
 export class StreamProcessor extends DurableObject {
-  private river?: River<any>;
+  private nagare?: Nagare<any>;
 
   async fetch(request: Request) {
     // Create a stateful stream processor
-    this.river = River
+    this.nagare = Nagare
       .fromWebSocket(request)
       .map(this.processMessage)
       .buffer(100)
@@ -202,7 +202,7 @@ export class StreamProcessor extends DurableObject {
   
   async alarm() {
     // Process buffered data periodically
-    const batch = await this.river?.take(100).toArray();
+    const batch = await this.nagare?.take(100).toArray();
     await this.processBatch(batch);
   }
 }
@@ -232,7 +232,7 @@ export class WebSocketDO extends DurableObject {
 
 ```typescript
 // Real-time trade aggregation
-const trades = River.fromEventSource('/trades')
+const trades = Nagare.fromEventSource('/trades')
   .map(e => JSON.parse(e.data))
   .filter(t => t.symbol === 'BTC/USD')
   .windowedAggregate(100, 'mean')  // 100-trade moving average
@@ -250,7 +250,7 @@ const trades = River.fromEventSource('/trades')
 
 ```typescript
 // Process sensor telemetry with SIMD
-const telemetry = River
+const telemetry = Nagare
   .fromMQTT(mqttClient, 'sensors/+/data')
   .map(msg => new Float32Array(msg.payload))
   .mapWasm('kalman_filter')  // SIMD Kalman filtering
@@ -265,15 +265,15 @@ const telemetry = River
 
 ```typescript
 // Merge and combine multiple streams
-const temperature = River.fromSensor('temp');
-const humidity = River.fromSensor('humidity');
-const pressure = River.fromSensor('pressure');
+const temperature = Nagare.fromSensor('temp');
+const humidity = Nagare.fromSensor('humidity');
+const pressure = Nagare.fromSensor('pressure');
 
 // Merge all readings (interleaved)
-const allReadings = river.merge(temperature, humidity, pressure);
+const allReadings = nagare.merge(temperature, humidity, pressure);
 
 // Combine latest values from each
-const combined = river.combine(temperature, humidity, pressure)
+const combined = nagare.combine(temperature, humidity, pressure)
   .map(([t, h, p]) => ({
     temperature: t,
     humidity: h,
@@ -308,11 +308,11 @@ const combined = river.combine(temperature, humidity, pressure)
 ### Stream Creation
 
 ```typescript
-River.from(source)           // From iterable/async iterable
-River.of(...values)          // From values
-River.empty()                // Empty stream
-river.range(0, 100)          // Numeric range
-river.interval(1000)         // Periodic emissions
+Nagare.from(source)           // From iterable/async iterable
+Nagare.of(...values)          // From values
+Nagare.empty()                // Empty stream
+nagare.range(0, 100)          // Numeric range
+nagare.interval(1000)         // Periodic emissions
 createFromWebSocket(ws)      // WebSocket stream
 createFromEventSource(url)   // Server-sent events
 createFromFetch(url, opts)   // HTTP polling
@@ -338,12 +338,12 @@ startWith(...values)         // Prepend values
 ### Combination Operators
 
 ```typescript
-merge(...rivers)             // Merge streams
+merge(...nagares)             // Merge streams
 fork(predicate)             // Split stream
 concatMap(fn)               // Sequential flatten
 switchMap(fn)               // Cancel previous
-combineLatest(...rivers)    // Combine latest values
-withLatestFrom(river)       // Sample other stream
+combineLatest(...nagares)    // Combine latest values
+withLatestFrom(nagare)       // Sample other stream
 ```
 
 ### Error Handling
@@ -402,9 +402,9 @@ wrangler deploy
 
 ```javascript
 // Automatic WASM loading
-import { river } from '@aid-on/nagare';
+import { nagare } from '@aid-on/nagare';
 
-const result = await river
+const result = await nagare
   .from(data)
   .mapWasm('simd_kernel')
   .toArray();
@@ -414,9 +414,9 @@ const result = await river
 
 ```html
 <script type="module">
-  import { River } from 'https://cdn.skypack.dev/@aid-on/nagare';
+  import { Nagare } from 'https://cdn.skypack.dev/@aid-on/nagare';
   
-  const stream = River.from([1, 2, 3])
+  const stream = Nagare.from([1, 2, 3])
     .map(x => x * 2)
     .observe(console.log);
 </script>

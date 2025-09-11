@@ -1,4 +1,4 @@
-export { River } from './river';
+export { Nagare } from './nagare';
 export * from './operators';
 export { 
   BYOBStreamReader, 
@@ -21,27 +21,27 @@ export {
 export * from './serialization';
 export * from './types';
 
-import { River } from './river';
+import { Nagare } from './nagare';
 import { createFromReadableStream, createFromArray, createFromPromise } from './sources';
 
-export const river = {
+export const nagare = {
   from: createFromArray,
   fromReadableStream: createFromReadableStream,
   fromPromise: createFromPromise,
   
-  empty: <T>(): River<T> => new River<T>([]),
+  empty: <T>(): Nagare<T> => new Nagare<T>([]),
   
-  of: <T>(...values: T[]): River<T> => new River<T>(values),
+  of: <T>(...values: T[]): Nagare<T> => new Nagare<T>(values),
   
-  range: (start: number, end: number, step = 1): River<number> => {
+  range: (start: number, end: number, step = 1): Nagare<number> => {
     const values: number[] = [];
     for (let i = start; i < end; i += step) {
       values.push(i);
     }
-    return new River<number>(values);
+    return new Nagare<number>(values);
   },
   
-  interval: (ms: number, signal?: AbortSignal): River<number> => {
+  interval: (ms: number, signal?: AbortSignal): Nagare<number> => {
     const generator = async function* (): AsyncGenerator<number> {
       let count = 0;
       while (!signal?.aborted) {
@@ -49,18 +49,18 @@ export const river = {
         await new Promise(resolve => setTimeout(resolve, ms));
       }
     };
-    return new River<number>(generator());
+    return new Nagare<number>(generator());
   },
   
-  merge: <T>(...rivers: River<T>[]): River<T> => {
-    return rivers[0].merge(...rivers.slice(1));
+  merge: <T>(...nagares: Nagare<T>[]): Nagare<T> => {
+    return nagares[0].merge(...nagares.slice(1));
   },
   
-  combine: <T extends unknown[]>(...rivers: { [K in keyof T]: River<T[K]> }): River<T> => {
+  combine: <T extends unknown[]>(...nagares: { [K in keyof T]: Nagare<T[K]> }): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
-      const iterators = rivers.map(r => r[Symbol.asyncIterator]());
-      const values: (T[number] | undefined)[] = new Array(rivers.length);
-      let hasValues = new Array(rivers.length).fill(false);
+      const iterators = nagares.map(r => r[Symbol.asyncIterator]());
+      const values: (T[number] | undefined)[] = new Array(nagares.length);
+      let hasValues = new Array(nagares.length).fill(false);
       
       while (true) {
         const results = await Promise.all(
@@ -82,8 +82,8 @@ export const river = {
         }
       }
     };
-    return new River<T>(generator());
+    return new Nagare<T>(generator());
   },
 };
 
-export default river;
+export default nagare;

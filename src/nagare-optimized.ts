@@ -23,7 +23,7 @@ type Operator<T, U> = {
 //   },
 // };
 
-export class OptimizedRiver<T, E = never> implements AsyncIterable<T> {
+export class OptimizedNagare<T, E = never> implements AsyncIterable<T> {
   private source: AsyncIterable<T> | Iterable<T> | T[];
   private operators: Operator<any, any>[] = [];
   // private compiledPipeline?: Function;  // Reserved for caching compiled functions
@@ -177,32 +177,32 @@ export class OptimizedRiver<T, E = never> implements AsyncIterable<T> {
     };
   }
 
-  map<U>(fn: (value: T) => U): OptimizedRiver<U, E> {
-    const newRiver = new OptimizedRiver<U, E>(this.source as any);
+  map<U>(fn: (value: T) => U): OptimizedNagare<U, E> {
+    const newRiver = new OptimizedNagare<U, E>(this.source as any);
     newRiver.operators = [...this.operators, { type: 'map', fn }];
     return newRiver;
   }
 
-  filter(predicate: (value: T) => boolean): OptimizedRiver<T, E> {
-    const newRiver = new OptimizedRiver<T, E>(this.source);
+  filter(predicate: (value: T) => boolean): OptimizedNagare<T, E> {
+    const newRiver = new OptimizedNagare<T, E>(this.source);
     newRiver.operators = [...this.operators, { type: 'filter', fn: predicate }];
     return newRiver;
   }
 
-  scan<U>(fn: (acc: U, value: T) => U, initial: U): OptimizedRiver<U, E> {
-    const newRiver = new OptimizedRiver<U, E>(this.source as any);
+  scan<U>(fn: (acc: U, value: T) => U, initial: U): OptimizedNagare<U, E> {
+    const newRiver = new OptimizedNagare<U, E>(this.source as any);
     newRiver.operators = [...this.operators, { type: 'scan', scanFn: fn, initial }];
     return newRiver;
   }
 
-  take(n: number): OptimizedRiver<T, E> {
-    const newRiver = new OptimizedRiver<T, E>(this.source);
+  take(n: number): OptimizedNagare<T, E> {
+    const newRiver = new OptimizedNagare<T, E>(this.source);
     newRiver.operators = [...this.operators, { type: 'take', n }];
     return newRiver;
   }
 
-  skip(n: number): OptimizedRiver<T, E> {
-    const newRiver = new OptimizedRiver<T, E>(this.source);
+  skip(n: number): OptimizedNagare<T, E> {
+    const newRiver = new OptimizedNagare<T, E>(this.source);
     newRiver.operators = [...this.operators, { type: 'skip', n }];
     return newRiver;
   }
@@ -287,21 +287,21 @@ export class OptimizedRiver<T, E = never> implements AsyncIterable<T> {
     }
   }
 
-  static from<T>(source: T[] | Iterable<T> | AsyncIterable<T>): OptimizedRiver<T> {
-    return new OptimizedRiver<T>(source);
+  static from<T>(source: T[] | Iterable<T> | AsyncIterable<T>): OptimizedNagare<T> {
+    return new OptimizedNagare<T>(source);
   }
 
-  static of<T>(...values: T[]): OptimizedRiver<T> {
-    return new OptimizedRiver<T>(values);
+  static of<T>(...values: T[]): OptimizedNagare<T> {
+    return new OptimizedNagare<T>(values);
   }
 
-  static range(start: number, end: number, step = 1): OptimizedRiver<number> {
+  static range(start: number, end: number, step = 1): OptimizedNagare<number> {
     const size = Math.ceil((end - start) / step);
     const values = new Array(size);
     for (let i = 0, val = start; i < size; i++, val += step) {
       values[i] = val;
     }
-    return new OptimizedRiver<number>(values);
+    return new OptimizedNagare<number>(values);
   }
 
   // Batch processing for better cache locality
@@ -340,7 +340,7 @@ export class OptimizedRiver<T, E = never> implements AsyncIterable<T> {
 
 // Export optimized river factory
 export const optimizedRiver = {
-  from: <T>(source: T[] | Iterable<T> | AsyncIterable<T>) => OptimizedRiver.from(source),
-  of: <T>(...values: T[]) => OptimizedRiver.of(...values),
-  range: (start: number, end: number, step = 1) => OptimizedRiver.range(start, end, step),
+  from: <T>(source: T[] | Iterable<T> | AsyncIterable<T>) => OptimizedNagare.from(source),
+  of: <T>(...values: T[]) => OptimizedNagare.of(...values),
+  range: (start: number, end: number, step = 1) => OptimizedNagare.range(start, end, step),
 };

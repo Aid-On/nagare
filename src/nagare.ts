@@ -1,7 +1,7 @@
 import type { Disposable, Subscription, ErrorHandler } from './types';
 import { loadWasm, wasmModule } from './wasm-loader';
 
-export class River<T, E = never> implements AsyncIterable<T> {
+export class Nagare<T, E = never> implements AsyncIterable<T> {
   private source: AsyncIterable<T> | Iterable<T> | ReadableStream<T>;
   private operators: Array<(value: T) => T | Promise<T> | undefined> = [];
   private errorHandler?: ErrorHandler<E>;
@@ -104,31 +104,31 @@ export class River<T, E = never> implements AsyncIterable<T> {
     return current;
   }
 
-  map<U>(fn: (value: T) => U | Promise<U>): River<U, E> {
-    const newRiver = new River<U, E>(this as any);
-    newRiver.operators = [...this.operators, fn as any];
-    newRiver.errorHandler = this.errorHandler;
-    newRiver.terminateOnError = this.terminateOnError;
-    return newRiver;
+  map<U>(fn: (value: T) => U | Promise<U>): Nagare<U, E> {
+    const newNagare = new Nagare<U, E>(this as any);
+    newNagare.operators = [...this.operators, fn as any];
+    newNagare.errorHandler = this.errorHandler;
+    newNagare.terminateOnError = this.terminateOnError;
+    return newNagare;
   }
 
-  filter(predicate: (value: T) => boolean | Promise<boolean>): River<T, E> {
-    const newRiver = new River<T, E>(this);
+  filter(predicate: (value: T) => boolean | Promise<boolean>): Nagare<T, E> {
+    const newNagare = new Nagare<T, E>(this);
     const filterOp = async (value: T): Promise<T | undefined> => {
       const result = predicate(value);
       const shouldKeep = result instanceof Promise ? await result : result;
       return shouldKeep ? value : undefined;
     };
-    newRiver.operators = [...this.operators, filterOp as any];
-    newRiver.errorHandler = this.errorHandler;
-    newRiver.terminateOnError = this.terminateOnError;
-    return newRiver;
+    newNagare.operators = [...this.operators, filterOp as any];
+    newNagare.errorHandler = this.errorHandler;
+    newNagare.terminateOnError = this.terminateOnError;
+    return newNagare;
   }
 
   scan<U>(
     fn: (acc: U, value: T) => U | Promise<U>,
     initial: U
-  ): River<U, E> {
+  ): Nagare<U, E> {
     let accumulator = initial;
     return this.map(async (value) => {
       const result = fn(accumulator, value);
@@ -137,23 +137,23 @@ export class River<T, E = never> implements AsyncIterable<T> {
     });
   }
 
-  take(count: number): River<T, E> {
+  take(count: number): Nagare<T, E> {
     let taken = 0;
     return this.filter(() => taken++ < count);
   }
 
-  skip(count: number): River<T, E> {
+  skip(count: number): Nagare<T, E> {
     let skipped = 0;
     return this.filter(() => ++skipped > count);
   }
 
-  fork(predicate: (value: T) => boolean): [River<T, E>, River<T, E>] {
+  fork(predicate: (value: T) => boolean): [Nagare<T, E>, Nagare<T, E>] {
     const left = this.filter(predicate);
     const right = this.filter((v) => !predicate(v));
     return [left, right];
   }
 
-  merge<U>(...others: River<U, E>[]): River<T | U, E> {
+  merge<U>(...others: Nagare<U, E>[]): Nagare<T | U, E> {
     const sources = [this, ...others];
     const generator = async function* (): AsyncGenerator<T | U> {
       const iterators = sources.map(s => s[Symbol.asyncIterator]());
@@ -176,28 +176,28 @@ export class River<T, E = never> implements AsyncIterable<T> {
         }
       }
     };
-    return new River<T | U, E>(generator());
+    return new Nagare<T | U, E>(generator());
   }
 
-  rescue(handler: (error: unknown) => T | undefined): River<T, E> {
-    const newRiver = new River<T, E>(this);
-    newRiver.operators = [...this.operators];
-    newRiver.errorHandler = handler as any;
-    newRiver.terminateOnError = this.terminateOnError;
-    return newRiver;
+  rescue(handler: (error: unknown) => T | undefined): Nagare<T, E> {
+    const newNagare = new Nagare<T, E>(this);
+    newNagare.operators = [...this.operators];
+    newNagare.errorHandler = handler as any;
+    newNagare.terminateOnError = this.terminateOnError;
+    return newNagare;
   }
 
-  terminateOnErrorMode(): River<T, E> {
-    const newRiver = new River<T, E>(this);
-    newRiver.terminateOnError = true;
-    return newRiver;
+  terminateOnErrorMode(): Nagare<T, E> {
+    const newNagare = new Nagare<T, E>(this);
+    newNagare.terminateOnError = true;
+    return newNagare;
   }
 
-  async mapWasm(kernelName: string, _params?: any): Promise<River<T, E>> {
+  async mapWasm(kernelName: string, _params?: any): Promise<Nagare<T, E>> {
     await loadWasm();
-    const newRiver = new River<T, E>(this);
+    const newNagare = new Nagare<T, E>(this);
     
-    newRiver.operators.push((value: T) => {
+    newNagare.operators.push((value: T) => {
       if (!wasmModule) throw new Error('WASM module not loaded');
       
       if (value instanceof Float32Array) {
@@ -208,10 +208,10 @@ export class River<T, E = never> implements AsyncIterable<T> {
       return value;
     });
     
-    return newRiver;
+    return newNagare;
   }
 
-  windowedAggregate(windowSize: number, operation: string): River<number, E> {
+  windowedAggregate(windowSize: number, operation: string): Nagare<number, E> {
     let window: number[] = [];
     const self = this;
     
@@ -247,7 +247,7 @@ export class River<T, E = never> implements AsyncIterable<T> {
       }
     };
     
-    return new River<number, E>(generator());
+    return new Nagare<number, E>(generator());
   }
 
   toReadableStream(): ReadableStream<T> {
@@ -265,31 +265,31 @@ export class River<T, E = never> implements AsyncIterable<T> {
     });
   }
 
-  static fromReadableStream<T>(stream: ReadableStream<T>): River<T> {
-    return new River<T>(stream);
+  static fromReadableStream<T>(stream: ReadableStream<T>): Nagare<T> {
+    return new Nagare<T>(stream);
   }
 
-  static from<T>(source: AsyncIterable<T> | Iterable<T> | Promise<T>): River<T> {
+  static from<T>(source: AsyncIterable<T> | Iterable<T> | Promise<T>): Nagare<T> {
     if (source instanceof Promise) {
       const generator = async function* (): AsyncGenerator<T> {
         yield await source;
       };
-      return new River<T>(generator());
+      return new Nagare<T>(generator());
     }
-    return new River<T>(source);
+    return new Nagare<T>(source);
   }
 
-  static empty<T>(): River<T> {
-    return new River<T>([]);
+  static empty<T>(): Nagare<T> {
+    return new Nagare<T>([]);
   }
 
-  static of<T>(...values: T[]): River<T> {
-    return new River<T>(values);
+  static of<T>(...values: T[]): Nagare<T> {
+    return new Nagare<T>(values);
   }
 
   async *[Symbol.asyncIterator](): AsyncIterator<T> {
-    if (this.source instanceof River) {
-      // Handle nested River sources (from chained operations like rescue, map, etc.)
+    if (this.source instanceof Nagare) {
+      // Handle nested Nagare sources (from chained operations like rescue, map, etc.)
       // Propagate error handler to the source river to ensure errors are caught at the right level
       if (this.errorHandler && !this.source.errorHandler) {
         this.source.errorHandler = this.errorHandler;
@@ -313,7 +313,7 @@ export class River<T, E = never> implements AsyncIterable<T> {
         reader.releaseLock();
       }
     } else if (typeof this.source === 'function') {
-      // Handle AsyncGenerator functions (created by River.from for promises, etc.)
+      // Handle AsyncGenerator functions (created by Nagare.from for promises, etc.)
       const generator = (this.source as () => AsyncGenerator<T>)();
       for await (const value of generator) {
         const processed = await this.applyOperators(value);
