@@ -23,13 +23,15 @@ Nagare is a next-generation stream processing library that delivers **5-10x perf
 ## ⚡ Performance First
 
 ```
-🏆 Benchmark Results (vs RxJS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏆 Benchmark Results (vs RxJS, after WASM warmup)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Map + Filter     : 8.78x faster ⚡
 Scan/Reduce      : 7.32x faster ⚡  
 Complex Pipeline : 1.52x faster ⚡
 Average Speedup  : 5.87x 🚀
 ```
+
+> **Note**: Performance gains are measured after WASM initialization. Initial cold-start includes ~50ms WASM loading overhead, making Nagare optimal for sustained processing workloads rather than one-off operations.
 
 ## ✨ Why Nagare?
 
