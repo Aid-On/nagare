@@ -44,18 +44,32 @@ export async function loadWasm(): Promise<void> {
       }
 
       if (typeof window !== 'undefined') {
-        // Browser: load wasm-pack (web target) output via Vite's wasm plugin
-        const wasm = await import('../pkg/nagare.js');
-        if (typeof (wasm as any).default === 'function') {
-          await (wasm as any).default();
+        // Browser: load wasm-pack (web target). Pass the .wasm URL to init for bundlers.
+        const wasm: any = await import('../pkg/nagare.js');
+        const init = wasm.default;
+        if (typeof init === 'function') {
+          try {
+            // Prefer explicit URL so Vite can rewrite asset path
+            const wasmUrl: any = (await import('../pkg/nagare_bg.wasm?url')).default;
+            await init(wasmUrl);
+          } catch {
+            // Fallback to no-arg init (will try to fetch relative to glue script)
+            await init();
+          }
         }
         wasmModule = wasm;
       } else if (typeof process !== 'undefined' && process.versions?.node) {
         // Node.js: prefer web build if available (for SSR builds, Vite plugin handles assets). Fallback to mock.
         try {
-          const wasm = await import('../pkg/nagare.js');
-          if (typeof (wasm as any).default === 'function') {
-            await (wasm as any).default();
+          const wasm: any = await import('../pkg/nagare.js');
+          const init = wasm.default;
+          if (typeof init === 'function') {
+            try {
+              const wasmUrl: any = (await import('../pkg/nagare_bg.wasm?url')).default;
+              await init(wasmUrl);
+            } catch {
+              await init();
+            }
           }
           wasmModule = wasm;
         } catch {
@@ -64,9 +78,15 @@ export async function loadWasm(): Promise<void> {
         }
       } else {
         // Other environment - would load from pkg folder
-        const wasm = await import('../pkg/nagare.js');
-        if (typeof (wasm as any).default === 'function') {
-          await (wasm as any).default();
+        const wasm: any = await import('../pkg/nagare.js');
+        const init = wasm.default;
+        if (typeof init === 'function') {
+          try {
+            const wasmUrl: any = (await import('../pkg/nagare_bg.wasm?url')).default;
+            await init(wasmUrl);
+          } catch {
+            await init();
+          }
         }
         wasmModule = wasm;
       }
