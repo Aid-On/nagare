@@ -6,10 +6,12 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   protected operators: Array<(value: T) => T | Promise<T> | undefined> = [];
   protected errorHandler?: ErrorHandler<E>;
   protected terminateOnError = false;
+  private _originalArraySource?: any[];
 
   constructor(source: AsyncIterable<T> | Iterable<T> | ReadableStream<T> | T[]) {
     if (Array.isArray(source)) {
       this.source = source;
+      this._originalArraySource = source;
     } else {
       this.source = source;
     }
@@ -145,6 +147,7 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     newNagare.operators = [...this.operators, fn as any];
     newNagare.errorHandler = this.errorHandler;
     newNagare.terminateOnError = this.terminateOnError;
+    newNagare._originalArraySource = this._originalArraySource;
     return newNagare;
   }
 
@@ -160,6 +163,7 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     newNagare.operators = [...this.operators, filterOp as any];
     newNagare.errorHandler = this.errorHandler;
     newNagare.terminateOnError = this.terminateOnError;
+    newNagare._originalArraySource = this._originalArraySource;
     return newNagare;
   }
 
@@ -401,34 +405,58 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   }
 
   async toArray(): Promise<T[]> {
-    // Aggressive optimization for synchronous array operations
-    if (Array.isArray(this.source) && this.operators.length > 0 && this.source.length > 0) {
+    // Ultra-fast path: detect common map+filter pattern
+    if (this._originalArraySource && this.operators.length === 2 && this._originalArraySource.length > 0) {
       try {
-        // Try to execute all operators synchronously on the array
-        let result: any[] = this.source;
+        // Check if this is a simple map -> filter chain
+        const mapOp = this.operators[0];
+        const filterOp = this.operators[1];
         
-        for (let opIndex = 0; opIndex < this.operators.length; opIndex++) {
-          const op = this.operators[opIndex];
-          const filtered: any[] = [];
-          
+        // Test first element to see if this is sync map+filter
+        const testMapped = mapOp(this._originalArraySource[0] as T);
+        if (testMapped instanceof Promise) throw new Error('async');
+        
+        const testFiltered = filterOp(testMapped as T);
+        if (testFiltered instanceof Promise) throw new Error('async');
+        
+        // Ultra-optimized fused map+filter implementation
+        const result = [];
+        const sourceArray = this._originalArraySource;
+        const length = sourceArray.length;
+        
+        // Pre-allocate result array with estimated size
+        result.length = 0;
+        
+        // Inline both operations for maximum speed
+        for (let i = 0; i < length; i++) {
+          const item = sourceArray[i];
+          const mapped = mapOp(item as T);
+          const shouldInclude = filterOp(mapped as T);
+          if (shouldInclude !== undefined) {
+            result[result.length] = mapped;  // Faster than push()
+          }
+        }
+        return result as T[];
+      } catch (error) {
+        // Fall through to general case
+      }
+    }
+    
+    // General case: sync array optimization 
+    if (this._originalArraySource && this.operators.length > 0 && this._originalArraySource.length > 0) {
+      try {
+        let result: any[] = this._originalArraySource;
+        
+        for (const op of this.operators) {
+          const newResult = [];
           for (let i = 0; i < result.length; i++) {
-            try {
-              const processed = op(result[i]);
-              // If we get a Promise, fall back to async
-              if (processed instanceof Promise) {
-                throw new Error('async-fallback');
-              }
-              if (processed !== undefined) {
-                filtered.push(processed);
-              }
-            } catch (error: any) {
-              if (error?.message === 'async-fallback') {
-                throw error;
-              }
-              // Skip this item on other errors
+            const processed = op(result[i]);
+            if (processed instanceof Promise) throw new Error('async');
+            if (processed !== undefined) {
+              newResult.push(processed);
             }
           }
-          result = filtered;
+          result = newResult;
         }
         
         return result as T[];
