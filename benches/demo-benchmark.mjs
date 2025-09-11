@@ -135,10 +135,10 @@ export const runDemoBenchmark = async (testType = 'mapFilter', dataSize = 100000
   console.log('│ Library     │ Time    │ Ops/s   │ Winner       │');
   console.log('├─────────────┼─────────┼─────────┼──────────────┤');
   
-  results.forEach((result, index) => {
-    const time = result.time.toFixed(2) + 'ms';
-    const ops = result.throughput + 'M';
-    console.log(`│ ${result.name.padEnd(11)} │ ${time.padEnd(7)} │ ${ops.padEnd(7)} │ ${medals[index].padEnd(12)} │`);
+  results.forEach((lib, index) => {
+    const time = lib.time.toFixed(2) + 'ms';
+    const ops = lib.throughput + 'M';
+    console.log(`│ ${lib.name.padEnd(11)} │ ${time.padEnd(7)} │ ${ops.padEnd(7)} │ ${medals[index].padEnd(12)} │`);
   });
   
   console.log('└─────────────┴─────────┴─────────┴──────────────┘');
