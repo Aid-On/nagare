@@ -10,6 +10,9 @@ repository = "https://github.com/aid-on/nagare"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[package.metadata.wasm-pack]
+wasm-opt = false
+
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
 
