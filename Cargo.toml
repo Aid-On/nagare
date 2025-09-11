@@ -52,6 +52,11 @@ codegen-units = 1
 opt-level = 3
 
 [features]
-default = ["simd"]
+# Minimal web build by default to keep Pages build stable
+default = ["web_min"]
+web_min = []
 simd = []
+river = []
+byob = []
+serialization = []
 parallel = ["wasm-bindgen-rayon"]

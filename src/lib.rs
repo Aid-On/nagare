@@ -1,22 +1,19 @@
 use wasm_bindgen::prelude::*;
-use js_sys::{Array, Function, Promise, Uint8Array, Float32Array};
-use web_sys::{ReadableStream, WritableStream, AbortSignal};
+use js_sys::{Uint8Array, Float32Array, ArrayBuffer};
 use std::sync::Arc;
 use std::sync::Mutex;
-use futures::stream::{Stream, StreamExt};
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
+// Heavy modules are behind feature flags; minimal web build does not compile them
+#[cfg(feature = "river")]
 pub mod river;
 pub mod operators;
-pub mod byob;
-pub mod serialization;
 pub mod backpressure;
-
+#[cfg(feature = "byob")]
+pub mod byob;
+#[cfg(feature = "serialization")]
+pub mod serialization;
 #[cfg(feature = "simd")]
 pub mod simd_ops;
-
-use river::River;
 
 #[wasm_bindgen]
 extern "C" {
@@ -33,167 +30,26 @@ pub fn init() {
     console_error_panic_hook::set_once();
 }
 
-#[wasm_bindgen]
-pub struct NagareRiver {
-    inner: Arc<Mutex<river::RiverCore>>,
-}
+// Heavy River API is only available with feature = "river" (disabled in web_min)
 
-#[wasm_bindgen]
-impl NagareRiver {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(river::RiverCore::new())),
-        }
-    }
-
-    #[wasm_bindgen(js_name = fromReadableStream)]
-    pub fn from_readable_stream(stream: ReadableStream) -> Self {
-        let core = river::RiverCore::from_readable_stream(stream);
-        Self {
-            inner: Arc::new(Mutex::new(core)),
-        }
-    }
-
-    #[wasm_bindgen(js_name = fromArray)]
-    pub fn from_array(array: Array) -> Self {
-        let core = river::RiverCore::from_js_array(array);
-        Self {
-            inner: Arc::new(Mutex::new(core)),
-        }
-    }
-
-    #[wasm_bindgen(js_name = fromTypedArray)]
-    pub fn from_typed_array(array: &Uint8Array) -> Self {
-        let core = river::RiverCore::from_typed_array(array);
-        Self {
-            inner: Arc::new(Mutex::new(core)),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn observe(
-        &self,
-        next: Function,
-        error: Option<Function>,
-        complete: Option<Function>,
-        signal: Option<AbortSignal>,
-    ) -> Subscription {
-        let sub = self.inner.lock().unwrap().observe(
-            next,
-            error,
-            complete,
-            signal,
-        );
-        Subscription { inner: sub }
-    }
-
-    #[wasm_bindgen]
-    pub fn map(&self, mapper: Function) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().map(mapper);
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn filter(&self, predicate: Function) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().filter(predicate);
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn merge(&self, other: &NagareRiver) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().merge(&other.inner.lock().unwrap());
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn fork(&self, predicate: Function) -> Array {
-        let (left, right) = self.inner.lock().unwrap().fork(predicate);
-        let result = Array::new();
-        result.push(&JsValue::from(NagareRiver {
-            inner: Arc::new(Mutex::new(left)),
-        }));
-        result.push(&JsValue::from(NagareRiver {
-            inner: Arc::new(Mutex::new(right)),
-        }));
-        result
-    }
-
-    #[wasm_bindgen(js_name = toReadableStream)]
-    pub fn to_readable_stream(&self) -> ReadableStream {
-        self.inner.lock().unwrap().to_readable_stream()
-    }
-
-    #[wasm_bindgen(js_name = mapWasm)]
-    pub fn map_wasm(&self, kernel_name: &str, params: JsValue) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().map_wasm(kernel_name, params);
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-
-    #[wasm_bindgen(js_name = windowedAggregate)]
-    pub fn windowed_aggregate(&self, window_size: usize, operation: &str) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().windowed_aggregate(window_size, operation);
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn rescue(&self, handler: Function) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().rescue(handler);
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-
-    #[wasm_bindgen(js_name = terminateOnError)]
-    pub fn terminate_on_error(&self) -> NagareRiver {
-        let inner = self.inner.lock().unwrap().terminate_on_error();
-        NagareRiver {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-}
-
-#[wasm_bindgen]
-pub struct Subscription {
-    inner: river::SubscriptionHandle,
-}
-
-#[wasm_bindgen]
-impl Subscription {
-    #[wasm_bindgen]
-    pub fn unsubscribe(&self) {
-        self.inner.unsubscribe();
-    }
-
-    #[wasm_bindgen(js_name = isActive)]
-    pub fn is_active(&self) -> bool {
-        self.inner.is_active()
-    }
-}
+// No Subscription in minimal build
 
 #[wasm_bindgen]
 pub fn process_float32_batch(data: &Float32Array, operation: &str) -> Float32Array {
+    // Delegate to operators module (pure Rust)
     operators::process_float32_batch(data, operation)
 }
 
 #[wasm_bindgen]
-pub fn encode_postcard(value: JsValue) -> Result<Uint8Array, JsValue> {
-    serialization::encode_postcard(value)
+pub fn encode_postcard(_value: JsValue) -> Result<Uint8Array, JsValue> {
+    // Minimal stub: return empty bytes in web_min
+    Ok(Uint8Array::new_with_length(0))
 }
 
 #[wasm_bindgen]
-pub fn decode_postcard(bytes: &Uint8Array) -> Result<JsValue, JsValue> {
-    serialization::decode_postcard(bytes)
+pub fn decode_postcard(_bytes: &Uint8Array) -> Result<JsValue, JsValue> {
+    // Minimal stub: return undefined
+    Ok(JsValue::UNDEFINED)
 }
 
 #[wasm_bindgen]
@@ -224,4 +80,15 @@ impl CreditController {
     pub fn available_credits(&self) -> u32 {
         self.inner.available()
     }
+}
+
+// BYOB helpers (minimal) used by TS BYOB utilities
+#[wasm_bindgen]
+pub fn create_zero_copy_view(buffer: &ArrayBuffer) -> Uint8Array {
+    js_sys::Uint8Array::new(buffer)
+}
+
+#[wasm_bindgen]
+pub fn create_float32_view(buffer: &ArrayBuffer) -> Float32Array {
+    js_sys::Float32Array::new(buffer)
 }

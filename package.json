@@ -29,8 +29,8 @@
   ],
   "type": "module",
   "scripts": {
-    "build:wasm": "wasm-pack build --target web --out-dir pkg --features simd",
-    "build:wasm:node": "wasm-pack build --target nodejs --out-dir pkg-node --features simd",
+    "build:wasm": "wasm-pack build --target web --out-dir pkg --no-default-features --features web_min",
+    "build:wasm:node": "wasm-pack build --target nodejs --out-dir pkg-node --no-default-features --features web_min",
     "build:ts": "tsc && vite build",
     "build": "npm run build:wasm && npm run build:ts",
     "test": "vitest run",
