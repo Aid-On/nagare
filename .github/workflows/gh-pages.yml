@@ -38,17 +38,21 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build WASM (web target)
-        run: npm run build:wasm
+      - name: Install wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --locked
+
+      - name: Build WASM with cargo + wasm-bindgen
+        run: |
+          cargo build --release --target wasm32-unknown-unknown --no-default-features --features web_min
+          rm -rf pkg
+          mkdir -p pkg
+          wasm-bindgen --target web --out-dir pkg target/wasm32-unknown-unknown/release/nagare.wasm
 
       - name: Build demo
         run: npm run demo:build
