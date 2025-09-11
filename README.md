@@ -422,6 +422,17 @@ const result = await nagare
 </script>
 ```
 
+## 🔗 Links
+
+- [💻 GitHub Repository](https://github.com/Aid-On/nagare)
+- [📦 npm Package](https://www.npmjs.com/package/@aid-on/nagare)
+- [🎮 Live Demo](https://aid-on.github.io/nagare/)
+- [📊 Documentation](https://github.com/Aid-On/nagare#readme)
+
+## 📄 License
+
+MIT © [Aid-On](https://github.com/Aid-On)
+
 ---
 
 <div align="center">

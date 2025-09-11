@@ -39,7 +39,10 @@
     "bench": "node benches/benchmark.js",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "demo": "vite --config demo/vite.config.js",
+    "demo:build": "vite build --config demo/vite.config.js",
+    "demo:preview": "vite preview --config demo/vite.config.js"
   },
   "keywords": [
     "wasm",
@@ -52,7 +55,12 @@
     "simd",
     "performance"
   ],
-  "author": "aid-on",
+  "author": "Aid-On",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aid-On/nagare.git"
+  },
+  "homepage": "https://aid-on.github.io/nagare/",
   "license": "MIT",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240117.0",
