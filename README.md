@@ -1,7 +1,7 @@
 # 🌊 Nagare (流れ)
 
 <div align="center">
-  <img src="assets/nagare-hero.png" alt="Nagare - A flowing river through mountains, representing the seamless flow of data streams" width="100%" style="max-width: 800px; border-radius: 8px; margin-bottom: 20px;" />
+  <img src="https://github.com/aid-on-libs/nagare/assets/hero.jpg" alt="Nagare - A flowing river through mountains, representing the seamless flow of data streams" width="800" />
   
   <h3>WASM-first, stream-centric library for high-performance edge computing</h3>
   
