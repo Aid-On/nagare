@@ -220,10 +220,15 @@
       color: var(--primary);
     }
 
+    .code-toggle {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      margin-top: 1rem;
+    }
+
     .show-code-btn {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
+      position: static;
       padding: 0.25rem 0.75rem;
       background: var(--bg-lighter);
       border: 1px solid var(--primary);
@@ -241,7 +246,7 @@
 
     .code-sample {
       display: none;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
       padding: 1rem;
       background: var(--bg);
       border-radius: 8px;
@@ -251,9 +256,7 @@
       overflow-x: auto;
     }
 
-    .code-sample.visible {
-      display: block;
-    }
+    .code-sample.visible { display: block; }
 
     .code-sample pre {
       margin: 0;
@@ -323,11 +326,13 @@
     <div class="demo-grid">
       <!-- Basic Stream Demo -->
       <div class="demo-card">
-        <button class="show-code-btn" onclick="toggleCode('basicCode', this)">Show Code</button>
         <h3>📊 Basic Stream Processing</h3>
         <p>Map, filter, and reduce operations on data streams</p>
         <button id="basicDemo">Run Basic Demo</button>
         <button id="basicStop" disabled>Stop</button>
+        <div class="code-toggle">
+          <button class="show-code-btn" onclick="toggleCode('basicCode', this)">Show Code</button>
+        </div>
         <div class="code-sample" id="basicCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
@@ -351,11 +356,13 @@ stream.<span class="function">observe</span>(
 
       <!-- Real-time Data Stream -->
       <div class="demo-card">
-        <button class="show-code-btn" onclick="toggleCode('realtimeCode', this)">Show Code</button>
         <h3>⚡ Real-time Data Stream</h3>
         <p>Process continuous data with interval streams</p>
         <button id="realtimeDemo">Start Stream</button>
         <button id="realtimeStop" disabled>Stop Stream</button>
+        <div class="code-toggle">
+          <button class="show-code-btn" onclick="toggleCode('realtimeCode', this)">Show Code</button>
+        </div>
         <div class="code-sample" id="realtimeCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
@@ -382,10 +389,12 @@ stream.<span class="function">observe</span>(
 
       <!-- Performance Comparison -->
       <div class="demo-card">
-        <button class="show-code-btn" onclick="toggleCode('perfCode', this)">Show Code</button>
         <h3>🚀 Performance Test</h3>
         <p>Compare Nagare with native JavaScript array methods</p>
         <button id="perfDemo">Run Benchmark</button>
+        <div class="code-toggle">
+          <button class="show-code-btn" onclick="toggleCode('perfCode', this)">Show Code</button>
+        </div>
         <div class="code-sample" id="perfCode">
           <pre><code><span class="comment">// Nagare version - optimized streaming</span>
 <span class="keyword">const</span> nagareStream = nagare.<span class="function">from</span>(largeArray)
@@ -425,11 +434,13 @@ stream.<span class="function">observe</span>(
 
       <!-- Stream Merging -->
       <div class="demo-card">
-        <button class="show-code-btn" onclick="toggleCode('mergeCode', this)">Show Code</button>
         <h3>🔄 Stream Merging</h3>
         <p>Merge multiple streams into one</p>
         <button id="mergeDemo">Run Merge Demo</button>
         <button id="mergeStop" disabled>Stop</button>
+        <div class="code-toggle">
+          <button class="show-code-btn" onclick="toggleCode('mergeCode', this)">Show Code</button>
+        </div>
         <div class="code-sample" id="mergeCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
@@ -456,10 +467,12 @@ merged.<span class="function">observe</span>(value => {
 
       <!-- Error Handling -->
       <div class="demo-card">
-        <button class="show-code-btn" onclick="toggleCode('errorCode', this)">Show Code</button>
         <h3>🛡️ Error Recovery</h3>
         <p>Graceful error handling with rescue operator</p>
         <button id="errorDemo">Run Error Demo</button>
+        <div class="code-toggle">
+          <button class="show-code-btn" onclick="toggleCode('errorCode', this)">Show Code</button>
+        </div>
         <div class="code-sample" id="errorCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
@@ -488,10 +501,12 @@ stream.<span class="function">observe</span>(value => {
 
       <!-- Window Aggregation -->
       <div class="demo-card">
-        <button class="show-code-btn" onclick="toggleCode('windowCode', this)">Show Code</button>
         <h3>📈 Window Aggregation</h3>
         <p>Calculate rolling statistics over data windows</p>
         <button id="windowDemo">Run Window Demo</button>
+        <div class="code-toggle">
+          <button class="show-code-btn" onclick="toggleCode('windowCode', this)">Show Code</button>
+        </div>
         <div class="code-sample" id="windowCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
