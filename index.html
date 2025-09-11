@@ -92,6 +92,8 @@
       border: 1px solid var(--bg-lighter);
       transition: transform 0.2s, box-shadow 0.2s;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
 
     .demo-card:hover {
@@ -224,7 +226,13 @@
       display: flex;
       justify-content: flex-start;
       align-items: center;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .code-stack {
+      margin-top: auto;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--bg-lighter);
     }
 
     .show-code-btn {
@@ -312,7 +320,7 @@
       to { transform: rotate(360deg); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/main-s8FEXYwr.js"></script>
+  <script type="module" crossorigin src="./assets/main-B6b5y8kZ.js"></script>
 </head>
 <body>
   <div class="bg-animation"></div>
@@ -330,10 +338,13 @@
         <p>Map, filter, and reduce operations on data streams</p>
         <button id="basicDemo">Run Basic Demo</button>
         <button id="basicStop" disabled>Stop</button>
-        <div class="code-toggle">
-          <button class="show-code-btn" onclick="toggleCode('basicCode', this)">Show Code</button>
-        </div>
-        <div class="code-sample" id="basicCode">
+        <div class="stream-visualization" id="basicViz"></div>
+        <div class="output" id="basicOutput">Click "Run Basic Demo" to start...</div>
+        <div class="code-stack">
+          <div class="code-toggle">
+            <button class="show-code-btn" onclick="toggleCode('basicCode', this)">Show Code</button>
+          </div>
+          <div class="code-sample" id="basicCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
 <span class="comment">// Create a stream and apply transformations</span>
@@ -349,9 +360,8 @@ stream.<span class="function">observe</span>(
     onComplete: () => console.log(<span class="string">'Done!'</span>)
   }
 );</code></pre>
+          </div>
         </div>
-        <div class="stream-visualization" id="basicViz"></div>
-        <div class="output" id="basicOutput">Click "Run Basic Demo" to start...</div>
       </div>
 
       <!-- Real-time Data Stream -->
@@ -360,10 +370,13 @@ stream.<span class="function">observe</span>(
         <p>Process continuous data with interval streams</p>
         <button id="realtimeDemo">Start Stream</button>
         <button id="realtimeStop" disabled>Stop Stream</button>
-        <div class="code-toggle">
-          <button class="show-code-btn" onclick="toggleCode('realtimeCode', this)">Show Code</button>
-        </div>
-        <div class="code-sample" id="realtimeCode">
+        <div class="stream-visualization" id="realtimeViz"></div>
+        <div class="output" id="realtimeOutput">Click "Start Stream" to begin...</div>
+        <div class="code-stack">
+          <div class="code-toggle">
+            <button class="show-code-btn" onclick="toggleCode('realtimeCode', this)">Show Code</button>
+          </div>
+          <div class="code-sample" id="realtimeCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
 <span class="comment">// Create a stream that emits every 500ms</span>
@@ -382,9 +395,8 @@ stream.<span class="function">observe</span>(
   item => console.log(item),
   { signal: controller.signal }
 );</code></pre>
+          </div>
         </div>
-        <div class="stream-visualization" id="realtimeViz"></div>
-        <div class="output" id="realtimeOutput">Click "Start Stream" to begin...</div>
       </div>
 
       <!-- Performance Comparison -->
@@ -392,10 +404,26 @@ stream.<span class="function">observe</span>(
         <h3>🚀 Performance Test</h3>
         <p>Compare Nagare with native JavaScript array methods</p>
         <button id="perfDemo">Run Benchmark</button>
-        <div class="code-toggle">
-          <button class="show-code-btn" onclick="toggleCode('perfCode', this)">Show Code</button>
+        <div class="performance-meter" id="perfMeter">
+          <div class="metric">
+            <div class="metric-value" id="nagareTime">-</div>
+            <div class="metric-label">Nagare (ms)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="jsTime">-</div>
+            <div class="metric-label">Native JS (ms)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="speedup">-</div>
+            <div class="metric-label">Speedup</div>
+          </div>
         </div>
-        <div class="code-sample" id="perfCode">
+        <div class="output" id="perfOutput">Click "Run Benchmark" to test...</div>
+        <div class="code-stack">
+          <div class="code-toggle">
+            <button class="show-code-btn" onclick="toggleCode('perfCode', this)">Show Code</button>
+          </div>
+          <div class="code-sample" id="perfCode">
           <pre><code><span class="comment">// Nagare version - optimized streaming</span>
 <span class="keyword">const</span> nagareStream = nagare.<span class="function">from</span>(largeArray)
   .<span class="function">map</span>(x => x * 2)
@@ -414,22 +442,8 @@ stream.<span class="function">observe</span>(
 <span class="comment">// - Lazy evaluation</span>
 <span class="comment">// - Memory efficiency</span>
 <span class="comment">// - Operator fusion</span></code></pre>
-        </div>
-        <div class="performance-meter" id="perfMeter">
-          <div class="metric">
-            <div class="metric-value" id="nagareTime">-</div>
-            <div class="metric-label">Nagare (ms)</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value" id="jsTime">-</div>
-            <div class="metric-label">Native JS (ms)</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value" id="speedup">-</div>
-            <div class="metric-label">Speedup</div>
           </div>
         </div>
-        <div class="output" id="perfOutput">Click "Run Benchmark" to test...</div>
       </div>
 
       <!-- Stream Merging -->
@@ -438,10 +452,13 @@ stream.<span class="function">observe</span>(
         <p>Merge multiple streams into one</p>
         <button id="mergeDemo">Run Merge Demo</button>
         <button id="mergeStop" disabled>Stop</button>
-        <div class="code-toggle">
-          <button class="show-code-btn" onclick="toggleCode('mergeCode', this)">Show Code</button>
-        </div>
-        <div class="code-sample" id="mergeCode">
+        <div class="stream-visualization" id="mergeViz"></div>
+        <div class="output" id="mergeOutput">Click "Run Merge Demo" to start...</div>
+        <div class="code-stack">
+          <div class="code-toggle">
+            <button class="show-code-btn" onclick="toggleCode('mergeCode', this)">Show Code</button>
+          </div>
+          <div class="code-sample" id="mergeCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
 <span class="comment">// Create three different streams</span>
@@ -460,9 +477,8 @@ stream.<span class="function">observe</span>(
 merged.<span class="function">observe</span>(value => {
   console.log(<span class="string">'Received:'</span>, value);
 });</code></pre>
+          </div>
         </div>
-        <div class="stream-visualization" id="mergeViz"></div>
-        <div class="output" id="mergeOutput">Click "Run Merge Demo" to start...</div>
       </div>
 
       <!-- Error Handling -->
@@ -470,10 +486,13 @@ merged.<span class="function">observe</span>(value => {
         <h3>🛡️ Error Recovery</h3>
         <p>Graceful error handling with rescue operator</p>
         <button id="errorDemo">Run Error Demo</button>
-        <div class="code-toggle">
-          <button class="show-code-btn" onclick="toggleCode('errorCode', this)">Show Code</button>
-        </div>
-        <div class="code-sample" id="errorCode">
+        <div class="stream-visualization" id="errorViz"></div>
+        <div class="output" id="errorOutput">Click "Run Error Demo" to start...</div>
+        <div class="code-stack">
+          <div class="code-toggle">
+            <button class="show-code-btn" onclick="toggleCode('errorCode', this)">Show Code</button>
+          </div>
+          <div class="code-sample" id="errorCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
 <span class="keyword">const</span> stream = nagare.<span class="function">from</span>(data)
@@ -494,9 +513,8 @@ merged.<span class="function">observe</span>(value => {
 stream.<span class="function">observe</span>(value => {
   console.log(<span class="string">'Processed:'</span>, value);
 });</code></pre>
+          </div>
         </div>
-        <div class="stream-visualization" id="errorViz"></div>
-        <div class="output" id="errorOutput">Click "Run Error Demo" to start...</div>
       </div>
 
       <!-- Window Aggregation -->
@@ -504,10 +522,13 @@ stream.<span class="function">observe</span>(value => {
         <h3>📈 Window Aggregation</h3>
         <p>Calculate rolling statistics over data windows</p>
         <button id="windowDemo">Run Window Demo</button>
-        <div class="code-toggle">
-          <button class="show-code-btn" onclick="toggleCode('windowCode', this)">Show Code</button>
-        </div>
-        <div class="code-sample" id="windowCode">
+        <div class="stream-visualization" id="windowViz"></div>
+        <div class="output" id="windowOutput">Click "Run Window Demo" to start...</div>
+        <div class="code-stack">
+          <div class="code-toggle">
+            <button class="show-code-btn" onclick="toggleCode('windowCode', this)">Show Code</button>
+          </div>
+          <div class="code-sample" id="windowCode">
           <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
 
 <span class="comment">// Simulated sensor data</span>
@@ -525,9 +546,8 @@ stream.<span class="function">observe</span>(value => {
 stream.<span class="function">observe</span>(average => {
   console.log(<span class="string">'5-point average:'</span>, average);
 });</code></pre>
+          </div>
         </div>
-        <div class="stream-visualization" id="windowViz"></div>
-        <div class="output" id="windowOutput">Click "Run Window Demo" to start...</div>
       </div>
     </div>
 
