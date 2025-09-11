@@ -1,0 +1,43 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3c72;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2a5298;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#667eea;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="wave1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.1" />
+    </linearGradient>
+    <linearGradient id="wave2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.15" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.05" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="400" fill="url(#bg)" />
+  
+  <!-- Waves -->
+  <path d="M0,300 C150,340 350,260 600,300 C850,340 1050,260 1200,300 L1200,400 L0,400 Z" 
+        fill="url(#wave1)" opacity="0.8"/>
+  <path d="M0,320 C200,360 400,280 600,320 C800,360 1000,280 1200,320 L1200,400 L0,400 Z" 
+        fill="url(#wave2)" opacity="0.6"/>
+  
+  <!-- Text -->
+  <text x="600" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-size="96" font-weight="300" fill="white" text-anchor="middle" 
+        style="letter-spacing: 8px; text-shadow: 0 4px 20px rgba(0,0,0,0.3)">
+    NAGARE
+  </text>
+  
+  <text x="760" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-size="32" fill="white" opacity="0.7" text-anchor="start">
+    流れ
+  </text>
+  
+  <text x="600" y="230" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-size="24" font-weight="300" fill="white" opacity="0.9" text-anchor="middle">
+    High-Performance Stream Processing
+  </text>
+</svg>
