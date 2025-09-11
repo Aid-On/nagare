@@ -1,7 +1,5 @@
 use wasm_bindgen::prelude::*;
 use js_sys::{Uint8Array, Float32Array, ArrayBuffer};
-use std::sync::Arc;
-use std::sync::Mutex;
 
 // Heavy modules are behind feature flags; minimal web build does not compile them
 #[cfg(feature = "river")]
@@ -15,15 +13,7 @@ pub mod serialization;
 #[cfg(feature = "simd")]
 pub mod simd_ops;
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-macro_rules! console_log {
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
+// console logging bindings/macroは未使用のため削除
 
 #[wasm_bindgen(start)]
 pub fn init() {
