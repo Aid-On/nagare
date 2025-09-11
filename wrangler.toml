@@ -1,0 +1,35 @@
+name = "nagare-river"
+main = "durable-objects/river-do.ts"
+compatibility_date = "2024-01-15"
+workers_dev = true
+
+[build]
+command = "npm run build:wasm && npm run build:ts"
+
+[[durable_objects.bindings]]
+name = "RIVER_DO"
+class_name = "RiverDurableObject"
+script_name = "nagare-river"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RiverDurableObject"]
+
+[vars]
+ENVIRONMENT = "production"
+
+[site]
+bucket = "./dist"
+
+[[routes]]
+pattern = "nagare.example.com/*"
+zone_name = "example.com"
+
+[observability]
+enabled = true
+
+[[analytics.engine_datasets]]
+binding = "RIVER_ANALYTICS"
+
+[wasm_modules]
+NAGARE_WASM = "pkg/nagare_bg.wasm"
