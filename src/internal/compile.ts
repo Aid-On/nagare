@@ -2,35 +2,36 @@
 // These utilities are pure and do not import the Nagare class to avoid circular deps.
 
 export type JitMode = 'fast' | 'off';
+import { getOpMeta, FusedOp } from './tags';
 
 interface CompileOptions {
   jitMode: JitMode;
   ASYNC_DETECTED: symbol;
 }
 
-export function compileOperatorChain(
-  ops: Array<(value: any) => any>,
+export function compileOperatorChain<T = unknown>(
+  ops: Array<FusedOp<T>>,
   handler: ((e: any) => any) | undefined,
   terminateOnError: boolean | undefined,
   opts: CompileOptions
-): ((value: any) => any) | null {
+): ((value: T) => T | undefined) | null {
   try {
     // Error-handling path: guard each operator and allow handler/terminate semantics
     if (handler || terminateOnError) {
-      return (value: any) => {
-        let current: any = value;
+      return (value: T) => {
+        let current: T | undefined = value;
         try {
           for (let i = 0; i < ops.length; i++) {
-            const r = ops[i](current);
+            const r = ops[i](current as T);
             if (r instanceof Promise) throw opts.ASYNC_DETECTED;
-            current = r;
+            current = r as T | undefined;
             if (current === undefined) return undefined;
           }
-          return current;
+          return current as T;
         } catch (err) {
           if (handler) {
-            const recovered = (handler as any)(err);
-            return recovered as any;
+            const recovered = handler(err);
+            return recovered as T;
           }
           if (terminateOnError) throw err;
           return undefined;
@@ -42,14 +43,14 @@ export function compileOperatorChain(
     try {
       if (opts.jitMode === 'off') throw new Error('jit-disabled');
       const argNames: string[] = [];
-      const args: any[] = [];
+      const args: unknown[] = [];
       const prologue: string[] = [];
       const body: string[] = [];
       body.push('return function(value){');
       body.push('  let c = value;');
       for (let i = 0; i < ops.length; i++) {
-        const op: any = ops[i] as any;
-        const meta = op?.__nagareOp as { kind: 'map' | 'filter' | 'scan' | 'take' | 'skip'; predicate?: (v: any) => boolean; scanFn?: (a:any, v:any)=>any; initial?: any; n?: number } | undefined;
+        const op = ops[i];
+        const meta = getOpMeta(op);
         if (meta?.kind === 'filter' && typeof meta.predicate === 'function') {
           const name = `p${i}`;
           argNames.push(name);
@@ -87,46 +88,47 @@ export function compileOperatorChain(
       }
       body.push('  return c;');
       body.push('}');
-      const factory = new Function('AsyncDetected', ...argNames, [...prologue, ...body].join('\n')) as any;
+      const factory = new Function('AsyncDetected', ...argNames, [...prologue, ...body].join('\n')) as unknown as (
+        ad: symbol,
+        ...ops: unknown[]
+      ) => (value: T) => T | undefined;
       const compiled = factory(opts.ASYNC_DETECTED, ...args);
-      if (typeof compiled === 'function') {
-        return compiled as (value: any) => any;
-      }
+      return compiled;
     } catch {
       // Fallback to generic fused function
     }
 
     // Generic fused function
-    return (value: any) => {
-      let current = value;
+    return (value: T) => {
+      let current: T | undefined = value;
       for (let i = 0; i < ops.length; i++) {
-        const r = ops[i](current);
+        const r = ops[i](current as T);
         if (r instanceof Promise) throw opts.ASYNC_DETECTED;
-        current = r;
+        current = r as T | undefined;
         if (current === undefined) return undefined;
       }
-      return current;
+      return current as T;
     };
   } catch (error) {
     return null;
   }
 }
 
-export function compileOperatorChainUnchecked(
-  ops: Array<(value: any) => any>,
+export function compileOperatorChainUnchecked<T = unknown>(
+  ops: Array<FusedOp<T>>,
   opts: CompileOptions
-): (value: any) => any {
+): (value: T) => T | undefined {
   try {
     if (opts.jitMode === 'off') throw new Error('jit-disabled');
     const argNames: string[] = [];
-    const args: any[] = [];
+    const args: unknown[] = [];
     const prologue: string[] = [];
     const body: string[] = [];
     body.push('return function(value){');
     body.push('  let c = value;');
     for (let i = 0; i < ops.length; i++) {
-      const op: any = ops[i] as any;
-      const meta = op?.__nagareOp as { kind: 'map' | 'filter' | 'scan' | 'take' | 'skip'; predicate?: (v: any) => boolean; scanFn?: (a:any, v:any)=>any; initial?: any; n?: number } | undefined;
+      const op = ops[i];
+      const meta = getOpMeta(op);
       if (meta?.kind === 'filter' && typeof meta.predicate === 'function') {
         const name = `p${i}`;
         argNames.push(name);
@@ -164,38 +166,55 @@ export function compileOperatorChainUnchecked(
     }
     body.push('  return c;');
     body.push('}');
-    const factory = new Function(...argNames, [...prologue, ...body].join('\n')) as any;
+    const factory = new Function(...argNames, [...prologue, ...body].join('\n')) as unknown as (
+      ...ops: unknown[]
+    ) => (value: T) => T | undefined;
     const compiled = factory(...args);
-    if (typeof compiled === 'function') return compiled as (v: any) => any;
+    return compiled;
   } catch {
     // ignore
   }
-  return (value: any) => {
+  return (value: T) => {
+    let current: T | undefined = value;
+    for (let i = 0; i < ops.length; i++) {
+      current = ops[i](current as T) as T | undefined;
+      if (current === undefined) return undefined;
+    }
+    return current as T;
+  };
+}
+
+// Async per-item fused function (no error handling, state allowed via closures)
+export function compileOperatorChainAsync(
+  ops: Array<(value: any) => any>
+): (value: any) => Promise<any> {
+  return async (value: any) => {
     let current = value;
     for (let i = 0; i < ops.length; i++) {
-      current = ops[i](current);
+      const r = ops[i](current);
+      current = r instanceof Promise ? await r : r;
       if (current === undefined) return undefined;
     }
     return current;
   };
 }
 
-export function compileArrayKernelUnchecked(
-  ops: Array<(value: any) => any>,
+export function compileArrayKernelUnchecked<T = unknown>(
+  ops: Array<FusedOp<T>>,
   opts: CompileOptions
-): ((src: any[], start: number, out: any[], k: number) => number) | null {
+): ((src: T[], start: number, out: T[], k: number) => number) | null {
   try {
     if (opts.jitMode === 'off') throw new Error('jit-disabled');
     const argNames: string[] = [];
-    const args: any[] = [];
+    const args: unknown[] = [];
     const prologue: string[] = [];
     const body: string[] = [];
     body.push('return function(src, start, out, k){');
     body.push('  for (let i = start; i < src.length; i++) {');
     body.push('    let c = src[i];');
     for (let i = 0; i < ops.length; i++) {
-      const op: any = ops[i] as any;
-      const meta = op?.__nagareOp as { kind: 'map' | 'filter' | 'scan' | 'take' | 'skip'; predicate?: (v: any) => boolean; scanFn?: (a:any, v:any)=>any; initial?: any; n?: number } | undefined;
+      const op = ops[i];
+      const meta = getOpMeta(op);
       if (meta?.kind === 'filter' && typeof meta.predicate === 'function') {
         const name = `p${i}`;
         argNames.push(name);
@@ -235,25 +254,27 @@ export function compileArrayKernelUnchecked(
     body.push('  }');
     body.push('  return k;');
     body.push('}');
-    const factory = new Function(...argNames, [...prologue, ...body].join('\n')) as any;
-    const compiled = factory(...args);
-    if (typeof compiled === 'function') return compiled as any;
+    const factory = new Function(...argNames, [...prologue, ...body].join('\n')) as unknown as (
+      ...ops: unknown[]
+    ) => (src: T[], start: number, out: T[], k: number) => number;
+      const compiled = factory(...args);
+      return compiled;
   } catch {
     // ignore
   }
   return null;
 }
 
-export function compileArrayKernelUncheckedUnrolled(
-  ops: Array<(value: any) => any>,
+export function compileArrayKernelUncheckedUnrolled<T = unknown>(
+  ops: Array<FusedOp<T>>,
   unroll: number,
   opts: CompileOptions
-): ((src: any[], start: number, out: any[], k: number) => number) | null {
+): ((src: T[], start: number, out: T[], k: number) => number) | null {
   try {
     if (opts.jitMode === 'off') throw new Error('jit-disabled');
     // Exclude take (early break) for unrolled lanes to keep semantics simple
-    for (const op of ops as any[]) {
-      const meta = (op as any)?.__nagareOp as { kind?: string } | undefined;
+    for (const op of ops) {
+      const meta = getOpMeta(op);
       if (meta?.kind === 'take') return null;
     }
 
@@ -271,8 +292,8 @@ export function compileArrayKernelUncheckedUnrolled(
       body.push(`    let s${lane} = false;`);
     }
     for (let idx = 0; idx < ops.length; idx++) {
-      const op: any = ops[idx] as any;
-      const meta = op?.__nagareOp as { kind?: 'map'|'filter'|'scan'|'take'|'skip'; predicate?: (v:any)=>boolean; scanFn?: Function; initial?: any; n?: number } | undefined;
+        const op = ops[idx];
+        const meta = getOpMeta(op);
       if (meta?.kind === 'filter' && typeof meta.predicate === 'function') {
         const name = `p${idx}`;
         argNames.push(name);
@@ -315,8 +336,8 @@ export function compileArrayKernelUncheckedUnrolled(
     body.push('  for (; i < len; i++) {');
     body.push('    let c = src[i];');
     for (let idx = 0; idx < ops.length; idx++) {
-      const op: any = ops[idx] as any;
-      const meta = op?.__nagareOp as { kind?: 'map'|'filter'|'scan'|'take'|'skip'; predicate?: (v:any)=>boolean; scanFn?: Function; initial?: any; n?: number } | undefined;
+      const op = ops[idx];
+      const meta = getOpMeta(op);
       if (meta?.kind === 'filter' && typeof meta.predicate === 'function') {
         const name = `tp${idx}`;
         argNames.push(name);
@@ -348,12 +369,13 @@ export function compileArrayKernelUncheckedUnrolled(
     body.push('  }');
     body.push('  return k;');
     body.push('}');
-    const factory = new Function(...argNames, [...prologue, ...body].join('\n')) as any;
+    const factory = new Function(...argNames, [...prologue, ...body].join('\n')) as unknown as (
+      ...ops: unknown[]
+    ) => (src: T[], start: number, out: T[], k: number) => number;
     const compiled = factory(...args);
-    if (typeof compiled === 'function') return compiled as any;
+    return compiled;
   } catch {
     // ignore
   }
   return null;
 }
-

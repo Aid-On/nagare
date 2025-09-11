@@ -178,7 +178,7 @@ export class OptimizedNagare<T, E = never> implements AsyncIterable<T> {
   }
 
   map<U>(fn: (value: T) => U): OptimizedNagare<U, E> {
-    const newNagare = new OptimizedNagare<U, E>(this.source as any);
+    const newNagare = new OptimizedNagare<U, E>(this.source as Iterable<U> as unknown as U[] | Iterable<U>);
     newNagare.operators = [...this.operators, { type: 'map', fn }];
     return newNagare;
   }
@@ -190,7 +190,7 @@ export class OptimizedNagare<T, E = never> implements AsyncIterable<T> {
   }
 
   scan<U>(fn: (acc: U, value: T) => U, initial: U): OptimizedNagare<U, E> {
-    const newNagare = new OptimizedNagare<U, E>(this.source as any);
+    const newNagare = new OptimizedNagare<U, E>(this.source as Iterable<U> as unknown as U[] | Iterable<U>);
     newNagare.operators = [...this.operators, { type: 'scan', scanFn: fn, initial }];
     return newNagare;
   }

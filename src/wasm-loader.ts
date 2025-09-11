@@ -8,7 +8,7 @@ const isTestEnvironment = () => {
   return typeof process !== 'undefined' && 
          (process.env.NODE_ENV === 'test' || 
           process.env.VITEST === 'true' || 
-          typeof (globalThis as any).describe === 'function');
+          typeof (globalThis as Record<string, unknown>).describe === 'function');
 };
 
 // Mock WASM module for testing
@@ -45,13 +45,20 @@ export async function loadWasm(): Promise<void> {
 
       if (typeof window !== 'undefined') {
         // Browser: load wasm-pack (web target). Pass the .wasm URL to init for bundlers.
-        const wasm: any = await import('../pkg/nagare.js');
+        // Use dynamic import with any to avoid type errors when pkg is absent in typecheck
+        // @ts-ignore - generated at build time by wasm-bindgen
+        const jsPath: string = ['..','/pkg','/nagare.js'].join('');
+        // @ts-ignore - generated at build time by wasm-bindgen
+        const wasm = (await import(/* @vite-ignore */ jsPath)) as { default?: (u?: unknown) => Promise<void> | void } & Record<string, unknown>;
         const init = wasm.default;
         if (typeof init === 'function') {
           try {
             // Prefer explicit URL so Vite can rewrite asset path
-            const wasmUrl: any = (await import('../pkg/nagare_bg.wasm?url')).default;
-            await init(wasmUrl);
+            // @ts-ignore - url emitted by bundler
+            const wasmUrlPath: string = ['..','/pkg','/nagare_bg.wasm?url'].join('');
+            // @ts-ignore - url emitted by bundler
+            const wasmUrl = (await import(/* @vite-ignore */ wasmUrlPath)) as { default: string };
+            await init(wasmUrl.default);
           } catch {
             // Fallback to no-arg init (will try to fetch relative to glue script)
             await init();
@@ -61,12 +68,18 @@ export async function loadWasm(): Promise<void> {
       } else if (typeof process !== 'undefined' && process.versions?.node) {
         // Node.js: prefer web build if available (for SSR builds, Vite plugin handles assets). Fallback to mock.
         try {
-          const wasm: any = await import('../pkg/nagare.js');
+          // @ts-ignore - generated at build time by wasm-bindgen
+          const jsPath: string = ['..','/pkg','/nagare.js'].join('');
+          // @ts-ignore - generated at build time by wasm-bindgen
+          const wasm = (await import(/* @vite-ignore */ jsPath)) as { default?: (u?: unknown) => Promise<void> | void } & Record<string, unknown>;
           const init = wasm.default;
           if (typeof init === 'function') {
             try {
-              const wasmUrl: any = (await import('../pkg/nagare_bg.wasm?url')).default;
-              await init(wasmUrl);
+              // @ts-ignore - url emitted by bundler
+              const wasmUrlPath: string = ['..','/pkg','/nagare_bg.wasm?url'].join('');
+              // @ts-ignore - url emitted by bundler
+              const wasmUrl = (await import(/* @vite-ignore */ wasmUrlPath)) as { default: string };
+              await init(wasmUrl.default);
             } catch {
               await init();
             }
@@ -78,12 +91,18 @@ export async function loadWasm(): Promise<void> {
         }
       } else {
         // Other environment - would load from pkg folder
-        const wasm: any = await import('../pkg/nagare.js');
+        // @ts-ignore - generated at build time by wasm-bindgen
+        const jsPath: string = ['..','/pkg','/nagare.js'].join('');
+        // @ts-ignore - generated at build time by wasm-bindgen
+        const wasm = (await import(/* @vite-ignore */ jsPath)) as { default?: (u?: unknown) => Promise<void> | void } & Record<string, unknown>;
         const init = wasm.default;
         if (typeof init === 'function') {
           try {
-            const wasmUrl: any = (await import('../pkg/nagare_bg.wasm?url')).default;
-            await init(wasmUrl);
+            // @ts-ignore - url emitted by bundler
+            const wasmUrlPath: string = ['..','/pkg','/nagare_bg.wasm?url'].join('');
+            // @ts-ignore - url emitted by bundler
+            const wasmUrl = (await import(/* @vite-ignore */ wasmUrlPath)) as { default: string };
+            await init(wasmUrl.default);
           } catch {
             await init();
           }

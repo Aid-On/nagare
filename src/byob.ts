@@ -53,7 +53,8 @@ export class BYOBStreamController {
       autoAllocateChunkSize: this.chunkSize,
 
       async pull(controller) {
-        const byobRequest = (controller as any).byobRequest;
+        const c = controller as unknown as { byobRequest?: { view?: Uint8Array; respond: (n: number) => void } };
+        const byobRequest = c.byobRequest;
         if (byobRequest) {
           const view = byobRequest.view;
           if (view) {

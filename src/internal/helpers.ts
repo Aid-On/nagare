@@ -1,8 +1,7 @@
 // Lightweight helpers extracted from Nagare core
 
-export function isTypedArrayLike(obj: any): obj is { length: number; [k: number]: any } {
-  return !!obj && typeof obj === 'object' && typeof (obj as any).length === 'number' &&
-    typeof (obj as any).buffer === 'object' && typeof (obj as any).BYTES_PER_ELEMENT === 'number' &&
-    typeof (obj as any).byteLength === 'number';
+export function isTypedArrayLike(obj: unknown): obj is { length: number; buffer: unknown; BYTES_PER_ELEMENT: number; byteLength: number } {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.length === 'number' && typeof o.buffer === 'object' && typeof o.BYTES_PER_ELEMENT === 'number' && typeof o.byteLength === 'number';
 }
-
