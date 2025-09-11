@@ -1,25 +1,38 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nagare (流れ) - Stream Processing Demo</title>
+  <title>🌊 Nagare - High-Performance Stream Processing</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/rxjs@7/dist/bundles/rxjs.umd.min.js"></script>
   <style>
     :root {
       --primary: #0ea5e9;
       --primary-dark: #0284c7;
       --secondary: #06b6d4;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      
       --bg: #0f172a;
       --bg-light: #1e293b;
       --bg-lighter: #334155;
-      --text: #e2e8f0;
+      --bg-card: #1e293b;
+      --bg-hover: #334155;
+      
+      --text: #f8fafc;
       --text-dim: #94a3b8;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --error: #ef4444;
+      --text-muted: #64748b;
+      
+      --border: #334155;
+      --border-light: #475569;
+      
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
 
     * {
@@ -29,573 +42,1316 @@
     }
 
     body {
-      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
       overflow-x: hidden;
     }
 
-    /* Background animation */
-    .bg-animation {
-      position: fixed;
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg) 100%);
+      padding: 2rem 0;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 100%;
+      right: 0;
+      bottom: 0;
       background: 
-        radial-gradient(circle at 20% 50%, rgba(14, 165, 233, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 40% 20%, rgba(14, 165, 233, 0.05) 0%, transparent 50%);
-      z-index: -1;
+        radial-gradient(circle at 30% 20%, rgba(14, 165, 233, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
+      pointer-events: none;
     }
 
-    .container {
+    .header-content {
+      position: relative;
       max-width: 1200px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 0 2rem;
     }
 
-    header {
-      text-align: center;
-      padding: 3rem 0;
-      margin-bottom: 3rem;
-      border-bottom: 1px solid var(--bg-lighter);
-    }
-
-    h1 {
-      font-size: 3rem;
+    .logo {
+      font-size: 3.5rem;
       font-weight: 700;
       background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
       margin-bottom: 0.5rem;
     }
 
-    .subtitle {
+    .tagline {
       font-size: 1.25rem;
       color: var(--text-dim);
-      font-family: 'Noto Sans JP';
+      margin-bottom: 2rem;
     }
 
-    .demo-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 2rem;
+    .header-links {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .header-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .header-link:hover {
+      background: var(--bg-hover);
+      border-color: var(--primary);
+    }
+
+    /* Navigation */
+    .nav {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .nav-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 1.5rem;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+
+    .nav-tab:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+
+    .nav-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: var(--bg);
+    }
+
+    /* Main Content */
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    .section {
+      display: none;
+      padding: 2rem 0;
+      min-height: 60vh;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    .section-header {
+      text-align: center;
       margin-bottom: 3rem;
     }
 
-    .demo-card {
-      background: var(--bg-light);
-      border-radius: 12px;
-      padding: 1.5rem;
-      border: 1px solid var(--bg-lighter);
-      transition: transform 0.2s, box-shadow 0.2s;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .demo-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    }
-
-    .demo-card h3 {
-      color: var(--primary);
+    .section-title {
+      font-size: 2.5rem;
+      font-weight: 700;
       margin-bottom: 1rem;
-      font-size: 1.25rem;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
-    .demo-card p {
+    .section-subtitle {
+      font-size: 1.125rem;
       color: var(--text-dim);
-      margin-bottom: 1rem;
-      font-size: 0.9rem;
+      max-width: 600px;
+      margin: 0 auto;
     }
 
-    button {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: opacity 0.2s;
-      margin-right: 0.5rem;
+    /* Performance Arena */
+    .performance-arena {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .arena-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .arena-title {
+      font-size: 1.5rem;
+      font-weight: 600;
       margin-bottom: 0.5rem;
     }
 
-    button:hover {
-      opacity: 0.9;
+    .benchmark-controls {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
     }
 
-    button:disabled {
-      opacity: 0.5;
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .control-label {
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    select, .btn {
+      padding: 0.75rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      color: var(--text);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    select:hover, .btn:hover {
+      border-color: var(--primary);
+    }
+
+    select:focus, .btn:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border-color: var(--primary);
+      color: white;
+      font-weight: 500;
+      min-width: 120px;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
     }
 
-    .output {
+    /* Results Table */
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
       background: var(--bg);
-      border: 1px solid var(--bg-lighter);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-top: 1rem;
-      font-family: 'Courier New', monospace;
-      font-size: 0.9rem;
-      max-height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin-bottom: 2rem;
     }
 
-    .stream-visualization {
+    .results-table th {
+      background: var(--bg-lighter);
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 1rem;
+      text-align: left;
+    }
+
+    .results-table td {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .competitor {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      margin: 1rem 0;
-      padding: 1rem;
-      background: var(--bg);
-      border-radius: 8px;
-      overflow-x: auto;
+      gap: 0.5rem;
+      font-weight: 500;
     }
 
-    .stream-item {
-      padding: 0.5rem 1rem;
-      background: var(--primary);
-      color: white;
-      border-radius: 6px;
-      animation: slideIn 0.3s ease-out;
-      white-space: nowrap;
+    .competitor-time {
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
     }
 
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(-20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
-    }
-
-    .performance-meter {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 1rem;
-      padding: 1rem;
-      background: var(--bg);
-      border-radius: 8px;
-    }
-
-    .metric {
-      text-align: center;
-    }
-
-    .metric-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--success);
-    }
-
-    .metric-label {
-      font-size: 0.8rem;
+    .competitor-throughput {
       color: var(--text-dim);
+      font-size: 0.875rem;
     }
 
+    .medal {
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .medal.gold { background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%); color: #1a202c; }
+    .medal.silver { background: linear-gradient(135deg, #c0c0c0 0%, #e2e8f0 100%); color: #1a202c; }
+    .medal.bronze { background: linear-gradient(135deg, #cd7f32 0%, #f6ad55 100%); color: #1a202c; }
+
+    /* Performance Summary */
+    .performance-summary {
+      background: linear-gradient(135deg, var(--success) 0%, var(--primary) 100%);
+      color: white;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .summary-text {
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    /* Feature Cards */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 2rem;
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .feature-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-description {
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+    }
+
+    .feature-demo {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .demo-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn-sm {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+    }
+
+    /* Code Examples */
     .code-example {
       background: var(--bg);
-      border: 1px solid var(--bg-lighter);
-      border-radius: 8px;
-      padding: 1rem;
-      margin: 1rem 0;
-      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin-bottom: 2rem;
     }
 
-    .code-example pre {
-      color: var(--text);
-      font-size: 0.85rem;
-      line-height: 1.5;
-    }
-
-    .highlight {
-      color: var(--primary);
-    }
-
-    .code-toggle {
-      display: flex;
-      justify-content: flex-start;
-      align-items: center;
-      margin-top: 0.5rem;
-    }
-
-    .code-stack {
-      margin-top: auto;
-      padding-top: 0.5rem;
-      border-top: 1px solid var(--bg-lighter);
-    }
-
-    .show-code-btn {
-      position: static;
-      padding: 0.25rem 0.75rem;
+    .code-header {
       background: var(--bg-lighter);
-      border: 1px solid var(--primary);
-      color: var(--primary);
-      border-radius: 4px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: all 0.2s;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-dim);
     }
 
-    .show-code-btn:hover {
-      background: var(--primary);
-      color: white;
-    }
-
-    .code-sample {
-      display: none;
-      margin-top: 0.5rem;
-      padding: 1rem;
-      background: var(--bg);
-      border-radius: 8px;
-      border: 1px solid var(--bg-lighter);
+    .code-content {
+      padding: 1.5rem;
       font-family: 'Courier New', monospace;
-      font-size: 0.8rem;
+      font-size: 0.875rem;
+      line-height: 1.6;
       overflow-x: auto;
     }
 
-    .code-sample.visible { display: block; }
-
-    .code-sample pre {
-      margin: 0;
-      color: var(--text);
+    /* API Reference */
+    .api-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
     }
 
-    .keyword {
+    .api-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+
+    .api-header {
+      background: var(--bg-lighter);
+      padding: 1rem;
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .api-methods {
+      padding: 1rem;
+    }
+
+    .api-method {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .api-method:last-child {
+      border-bottom: none;
+    }
+
+    .method-name {
+      font-family: 'Courier New', monospace;
+      font-weight: 500;
       color: var(--primary);
-      font-weight: bold;
     }
 
-    .string {
-      color: var(--success);
-    }
-
-    .comment {
+    .method-desc {
       color: var(--text-dim);
-      font-style: italic;
+      font-size: 0.875rem;
     }
 
-    .function {
-      color: var(--secondary);
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header-content {
+        padding: 0 1rem;
+      }
+
+      .logo {
+        font-size: 2.5rem;
+      }
+
+      .main {
+        padding: 0 1rem;
+      }
+
+      .section {
+        padding: 1rem 0;
+      }
+
+      .section-title {
+        font-size: 2rem;
+      }
+
+      .performance-arena,
+      .feature-card {
+        padding: 1.5rem;
+      }
+
+      .benchmark-controls {
+        flex-direction: column;
+        align-items: center;
+      }
     }
 
-    footer {
-      text-align: center;
-      padding: 2rem 0;
-      margin-top: 4rem;
-      border-top: 1px solid var(--bg-lighter);
-      color: var(--text-dim);
-    }
-
-    footer a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-
-    footer a:hover {
-      text-decoration: underline;
-    }
-
+    /* Loading Animation */
     .loading {
       display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,.3);
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid var(--border);
       border-radius: 50%;
-      border-top-color: white;
+      border-top-color: var(--primary);
       animation: spin 1s ease-in-out infinite;
     }
 
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* Status Messages */
+    .status {
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .status.info {
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+    }
   </style>
-  <script type="module" crossorigin src="./assets/main-lLniPeZv.js"></script>
+  <script type="module" crossorigin src="./assets/main-B5Qt9EMX.js"></script>
 </head>
 <body>
-  <div class="bg-animation"></div>
-  
-  <div class="container">
-    <header>
-      <h1>🌊 Nagare</h1>
-      <p class="subtitle">流れ - High-Performance Stream Processing</p>
-    </header>
-
-    <div class="demo-grid">
-      <!-- Basic Stream Demo -->
-      <div class="demo-card">
-        <h3>📊 Basic Stream Processing</h3>
-        <p>Map, filter, and reduce operations on data streams</p>
-        <button id="basicDemo">Run Basic Demo</button>
-        <button id="basicStop" disabled>Stop</button>
-        <div class="stream-visualization" id="basicViz"></div>
-        <div class="output" id="basicOutput">Click "Run Basic Demo" to start...</div>
-        <div class="code-stack">
-          <div class="code-toggle">
-            <button class="show-code-btn" onclick="toggleCode('basicCode', this)">Show Code</button>
-          </div>
-          <div class="code-sample" id="basicCode">
-          <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
-
-<span class="comment">// Create a stream and apply transformations</span>
-<span class="keyword">const</span> stream = nagare.<span class="function">from</span>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-  .<span class="function">map</span>(x => x * 2)        <span class="comment">// Double each value</span>
-  .<span class="function">filter</span>(x => x > 5)     <span class="comment">// Keep only values > 5</span>
-  .<span class="function">scan</span>((acc, x) => acc + x, 0); <span class="comment">// Running sum</span>
-
-<span class="comment">// Subscribe to the stream</span>
-stream.<span class="function">observe</span>(
-  value => console.log(<span class="string">'Value:'</span>, value),
-  {
-    onComplete: () => console.log(<span class="string">'Done!'</span>)
-  }
-);</code></pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Real-time Data Stream -->
-      <div class="demo-card">
-        <h3>⚡ Real-time Data Stream</h3>
-        <p>Process continuous data with interval streams</p>
-        <button id="realtimeDemo">Start Stream</button>
-        <button id="realtimeStop" disabled>Stop Stream</button>
-        <div class="stream-visualization" id="realtimeViz"></div>
-        <div class="output" id="realtimeOutput">Click "Start Stream" to begin...</div>
-        <div class="code-stack">
-          <div class="code-toggle">
-            <button class="show-code-btn" onclick="toggleCode('realtimeCode', this)">Show Code</button>
-          </div>
-          <div class="code-sample" id="realtimeCode">
-          <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
-
-<span class="comment">// Create a stream that emits every 500ms</span>
-<span class="keyword">const</span> stream = nagare.<span class="function">interval</span>(500)
-  .<span class="function">map</span>(i => ({
-    id: i,
-    value: Math.floor(Math.random() * 100),
-    timestamp: <span class="keyword">new</span> Date().toLocaleTimeString()
-  }))
-  .<span class="function">filter</span>(item => item.value > 30)  <span class="comment">// Only high values</span>
-  .<span class="function">take</span>(20);  <span class="comment">// Stop after 20 items</span>
-
-<span class="comment">// Subscribe with abort signal for cleanup</span>
-<span class="keyword">const</span> controller = <span class="keyword">new</span> AbortController();
-stream.<span class="function">observe</span>(
-  item => console.log(item),
-  { signal: controller.signal }
-);</code></pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Performance Comparison -->
-      <div class="demo-card">
-        <h3>🚀 Performance Test</h3>
-        <p>Compare Nagare with native JavaScript array methods</p>
-        <button id="perfDemo">Run Benchmark</button>
-        <div class="performance-meter" id="perfMeter">
-          <div class="metric">
-            <div class="metric-value" id="nagareTime">-</div>
-            <div class="metric-label">Nagare (ms)</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value" id="jsTime">-</div>
-            <div class="metric-label">Native JS (ms)</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value" id="speedup">-</div>
-            <div class="metric-label">Speedup</div>
-          </div>
-        </div>
-        <div class="output" id="perfOutput">Click "Run Benchmark" to test...</div>
-        <div class="code-stack">
-          <div class="code-toggle">
-            <button class="show-code-btn" onclick="toggleCode('perfCode', this)">Show Code</button>
-          </div>
-          <div class="code-sample" id="perfCode">
-          <pre><code><span class="comment">// Nagare version - optimized streaming</span>
-<span class="keyword">const</span> nagareStream = nagare.<span class="function">from</span>(largeArray)
-  .<span class="function">map</span>(x => x * 2)
-  .<span class="function">filter</span>(x => x % 3 === 0)
-  .<span class="function">scan</span>((acc, x) => acc + x, 0);
-
-<span class="keyword">const</span> result = <span class="keyword">await</span> nagareStream.<span class="function">last</span>();
-
-<span class="comment">// Native JS version - traditional approach</span>
-<span class="keyword">const</span> jsResult = largeArray
-  .map(x => x * 2)
-  .filter(x => x % 3 === 0)
-  .reduce((acc, x) => acc + x, 0);
-
-<span class="comment">// Nagare is optimized for:</span>
-<span class="comment">// - Lazy evaluation</span>
-<span class="comment">// - Memory efficiency</span>
-<span class="comment">// - Operator fusion</span></code></pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stream Merging -->
-      <div class="demo-card">
-        <h3>🔄 Stream Merging</h3>
-        <p>Merge multiple streams into one</p>
-        <button id="mergeDemo">Run Merge Demo</button>
-        <button id="mergeStop" disabled>Stop</button>
-        <div class="stream-visualization" id="mergeViz"></div>
-        <div class="output" id="mergeOutput">Click "Run Merge Demo" to start...</div>
-        <div class="code-stack">
-          <div class="code-toggle">
-            <button class="show-code-btn" onclick="toggleCode('mergeCode', this)">Show Code</button>
-          </div>
-          <div class="code-sample" id="mergeCode">
-          <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
-
-<span class="comment">// Create three different streams</span>
-<span class="keyword">const</span> stream1 = nagare.<span class="function">interval</span>(1000)
-  .<span class="function">map</span>(i => <span class="string">`A${i}`</span>).<span class="function">take</span>(5);
-
-<span class="keyword">const</span> stream2 = nagare.<span class="function">interval</span>(1500)
-  .<span class="function">map</span>(i => <span class="string">`B${i}`</span>).<span class="function">take</span>(5);
-
-<span class="keyword">const</span> stream3 = nagare.<span class="function">interval</span>(2000)
-  .<span class="function">map</span>(i => <span class="string">`C${i}`</span>).<span class="function">take</span>(5);
-
-<span class="comment">// Merge all streams - values interleaved by time</span>
-<span class="keyword">const</span> merged = stream1.<span class="function">merge</span>(stream2, stream3);
-
-merged.<span class="function">observe</span>(value => {
-  console.log(<span class="string">'Received:'</span>, value);
-});</code></pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Error Handling -->
-      <div class="demo-card">
-        <h3>🛡️ Error Recovery</h3>
-        <p>Graceful error handling with rescue operator</p>
-        <button id="errorDemo">Run Error Demo</button>
-        <div class="stream-visualization" id="errorViz"></div>
-        <div class="output" id="errorOutput">Click "Run Error Demo" to start...</div>
-        <div class="code-stack">
-          <div class="code-toggle">
-            <button class="show-code-btn" onclick="toggleCode('errorCode', this)">Show Code</button>
-          </div>
-          <div class="code-sample" id="errorCode">
-          <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
-
-<span class="keyword">const</span> stream = nagare.<span class="function">from</span>(data)
-  .<span class="function">map</span>(x => {
-    <span class="comment">// Simulate errors for certain values</span>
-    <span class="keyword">if</span> (x === 5 || x === 7) {
-      <span class="keyword">throw new</span> Error(<span class="string">`Error at ${x}`</span>);
-    }
-    <span class="keyword">return</span> x * 2;
-  })
-  .<span class="function">rescue</span>(error => {
-    <span class="comment">// Handle errors gracefully</span>
-    console.log(<span class="string">'Recovered from:'</span>, error);
-    <span class="keyword">return</span> -1;  <span class="comment">// Replace errors with -1</span>
-  });
-
-<span class="comment">// Stream continues even after errors</span>
-stream.<span class="function">observe</span>(value => {
-  console.log(<span class="string">'Processed:'</span>, value);
-});</code></pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Window Aggregation -->
-      <div class="demo-card">
-        <h3>📈 Window Aggregation</h3>
-        <p>Calculate rolling statistics over data windows</p>
-        <button id="windowDemo">Run Window Demo</button>
-        <div class="stream-visualization" id="windowViz"></div>
-        <div class="output" id="windowOutput">Click "Run Window Demo" to start...</div>
-        <div class="code-stack">
-          <div class="code-toggle">
-            <button class="show-code-btn" onclick="toggleCode('windowCode', this)">Show Code</button>
-          </div>
-          <div class="code-sample" id="windowCode">
-          <pre><code><span class="keyword">import</span> { nagare } <span class="keyword">from</span> <span class="string">'@aid-on/nagare'</span>;
-
-<span class="comment">// Simulated sensor data</span>
-<span class="keyword">const</span> sensorData = [50, 52, 48, 55, 51, 49, 53, ...];
-
-<span class="keyword">const</span> stream = nagare.<span class="function">from</span>(sensorData)
-  .<span class="function">windowedAggregate</span>(5, <span class="string">'mean'</span>);  <span class="comment">// 5-item rolling average</span>
-
-<span class="comment">// Other aggregation options:</span>
-<span class="comment">// - 'sum': Rolling sum</span>
-<span class="comment">// - 'max': Rolling maximum</span>
-<span class="comment">// - 'min': Rolling minimum</span>
-<span class="comment">// - 'mean': Rolling average</span>
-
-stream.<span class="function">observe</span>(average => {
-  console.log(<span class="string">'5-point average:'</span>, average);
-});</code></pre>
-          </div>
-        </div>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <h1 class="logo">🌊 NAGARE</h1>
+      <p class="tagline">High-Performance Stream Processing for JavaScript</p>
+      <div class="header-links">
+        <a href="https://github.com/Aid-On/nagare" class="header-link">
+          📦 GitHub
+        </a>
+        <a href="#" class="header-link">
+          📖 Documentation
+        </a>
+        <a href="#" class="header-link">
+          🚀 NPM
+        </a>
       </div>
     </div>
+  </header>
 
-    <!-- Code Examples -->
-    <div class="demo-card">
-      <h3>💻 Live Code Example</h3>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <button class="nav-tab active" data-section="performance">📊 Performance</button>
+      <button class="nav-tab" data-section="features">🔧 Features</button>
+      <button class="nav-tab" data-section="examples">🚀 Examples</button>
+      <button class="nav-tab" data-section="api">📖 API</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- Performance Section -->
+    <section class="section active" id="performance">
+      <div class="section-header">
+        <h2 class="section-title">⚡ Performance Showdown</h2>
+        <p class="section-subtitle">
+          See how Nagare compares against Native JavaScript and RxJS in real-time benchmarks.
+          Watch Nagare dominate in large-scale data processing scenarios.
+        </p>
+      </div>
+
+      <div class="performance-arena">
+        <div class="arena-header">
+          <h3 class="arena-title">🏟️ Benchmark Arena</h3>
+          <p>Choose your test and watch the performance battle unfold</p>
+        </div>
+
+        <div class="benchmark-controls">
+          <div class="control-group">
+            <label class="control-label">Test Type</label>
+            <select id="testType">
+              <option value="mapFilter">Map + Filter</option>
+              <option value="complex">Complex Pipeline</option>
+              <option value="large">Large Dataset</option>
+              <option value="objects">Object Processing</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label class="control-label">Data Size</label>
+            <select id="dataSize">
+              <option value="10000">10K elements</option>
+              <option value="100000" selected>100K elements</option>
+              <option value="1000000">1M elements</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label class="control-label">Action</label>
+            <button id="runBenchmark" class="btn">🚀 Run Benchmark</button>
+          </div>
+        </div>
+
+        <table class="results-table" id="resultsTable" style="display: none;">
+          <thead>
+            <tr>
+              <th>Library</th>
+              <th>Time</th>
+              <th>Throughput</th>
+              <th>Rank</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="competitor">🚀 Nagare</div></td>
+              <td class="competitor-time" id="nagareTime">-</td>
+              <td class="competitor-throughput" id="nagareThroughput">-</td>
+              <td><span class="medal" id="nagareMedal">-</span></td>
+            </tr>
+            <tr>
+              <td><div class="competitor">🟦 Native JS</div></td>
+              <td class="competitor-time" id="nativeTime">-</td>
+              <td class="competitor-throughput" id="nativeThroughput">-</td>
+              <td><span class="medal" id="nativeMedal">-</span></td>
+            </tr>
+            <tr>
+              <td><div class="competitor">🟨 RxJS</div></td>
+              <td class="competitor-time" id="rxjsTime">-</td>
+              <td class="competitor-throughput" id="rxjsThroughput">-</td>
+              <td><span class="medal" id="rxjsMedal">-</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="performance-summary" id="performanceSummary" style="display: none;">
+          <div class="summary-text" id="summaryText"></div>
+        </div>
+
+        <div id="benchmarkStatus"></div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section" id="features">
+      <div class="section-header">
+        <h2 class="section-title">🔧 Powerful Features</h2>
+        <p class="section-subtitle">
+          Explore Nagare's rich feature set with interactive demonstrations.
+          Each feature is designed for real-world performance and usability.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3 class="feature-title">Stream Transformation</h3>
+          <p class="feature-description">
+            Transform data streams with map, filter, and reduce operations.
+            Optimized for both small and large datasets.
+          </p>
+          <div class="feature-demo" id="transformDemo">
+            Input: [1, 2, 3, 4, 5, 6, 7, 8, 9]<br>
+            ↓ .map(x => x * 2)<br>
+            [2, 4, 6, 8, 10, 12, 14, 16, 18]<br>
+            ↓ .filter(x => x % 3 === 0)<br>
+            Output: <span id="transformResult">[6, 12, 18]</span>
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-sm" id="runTransform">▶ Run Demo</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">Real-time Processing</h3>
+          <p class="feature-description">
+            Handle continuous data streams with interval processing.
+            Perfect for live data feeds and real-time analytics.
+          </p>
+          <div class="feature-demo" id="realtimeDemo">
+            📡 Stream Status: <span id="streamStatus">Ready</span><br>
+            📊 Items Processed: <span id="itemCount">0</span><br>
+            🎯 Current Value: <span id="currentValue">-</span><br>
+            ⚡ Rate: <span id="processRate">0</span> items/sec
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-sm" id="startRealtime">▶ Start Stream</button>
+            <button class="btn btn-sm" id="stopRealtime">⏹ Stop</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3 class="feature-title">Stream Merging</h3>
+          <p class="feature-description">
+            Combine multiple data sources into unified streams.
+            Handles backpressure and synchronization automatically.
+          </p>
+          <div class="feature-demo" id="mergeDemo">
+            Stream A: <span id="streamA">[waiting...]</span><br>
+            Stream B: <span id="streamB">[waiting...]</span><br>
+            Stream C: <span id="streamC">[waiting...]</span><br>
+            ───────────────────────────────<br>
+            Merged: <span id="mergedResult">[click to start]</span>
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-sm" id="runMerge">▶ Merge Demo</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3 class="feature-title">Error Recovery</h3>
+          <p class="feature-description">
+            Graceful error handling with the rescue operator.
+            Keep streams flowing even when individual items fail.
+          </p>
+          <div class="feature-demo" id="errorDemo">
+            Input: <span id="errorInput">[1, "bad", 3, null, 5]</span><br>
+            ↓ .rescue(err => 0)<br>
+            Output: <span id="errorResult">[1, 0, 3, 0, 5]</span><br>
+            <br>
+            Status: <span id="errorStatus">✅ 4/5 items recovered</span>
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-sm" id="runError">▶ Error Demo</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3 class="feature-title">Window Operations</h3>
+          <p class="feature-description">
+            Calculate rolling statistics over sliding time windows.
+            Essential for time-series analysis and monitoring.
+          </p>
+          <div class="feature-demo" id="windowDemo">
+            Data: <span id="windowData">[1,2,3,4,5,6,7,8,9]</span><br>
+            Window Size: <span id="windowSize">3</span><br>
+            ──────────────────────────────<br>
+            Rolling Avg: <span id="windowResult">[2, 3, 4, 5, 6, 7]</span>
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-sm" id="runWindow">▶ Window Demo</button>
+            <button class="btn btn-sm" id="visualizeWindow">📊 Visualize</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🔧</div>
+          <h3 class="feature-title">Advanced Operators</h3>
+          <p class="feature-description">
+            Comprehensive set of operators for complex data transformations.
+            Scan, take, skip, fork, and more.
+          </p>
+          <div class="feature-demo" id="operatorDemo">
+            .scan((acc, x) => acc + x, 0)<br>
+            .take(5)<br>
+            .skip(2)<br>
+            .fork(x => x % 2 === 0)<br>
+            <br>
+            Result: <span id="operatorResult">[click to demo]</span>
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-sm" id="runOperators">▶ Run Demo</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Examples Section -->
+    <section class="section" id="examples">
+      <div class="section-header">
+        <h2 class="section-title">🚀 Code Examples</h2>
+        <p class="section-subtitle">
+          Real-world examples you can run and modify. Copy and paste into your projects.
+        </p>
+      </div>
+
       <div class="code-example">
-        <pre><code><span class="highlight">import</span> { Nagare } <span class="highlight">from</span> '@aid-on/nagare';
+        <div class="code-header">Quick Start - Basic Transformation</div>
+        <div class="code-content">
+<pre>import { Nagare } from '@aid-on/nagare';
 
-<span class="highlight">// Create a stream from various sources</span>
-<span class="highlight">const</span> stream = Nagare.from([1, 2, 3, 4, 5])
+// Simple transformation pipeline
+const result = await Nagare
+  .from([1, 2, 3, 4, 5])
   .map(x => x * 2)
   .filter(x => x > 5)
-  .scan((acc, x) => acc + x, 0);
+  .toArray();
 
-<span class="highlight">// Subscribe to stream values</span>
-stream.observe(
-  value => console.log('Value:', value),
-  {
-    onComplete: () => console.log('Stream completed!'),
-    onError: error => console.error('Error:', error)
-  }
-);</code></pre>
+console.log(result); // [6, 8, 10]</pre>
+        </div>
       </div>
-    </div>
 
-    <footer>
-      <p>
-        Built with 🦀 Rust + 🔥 WASM + 💙 TypeScript
-      </p>
-      <p>
-        <a href="https://github.com/Aid-On/nagare" target="_blank">GitHub</a> •
-        <a href="https://www.npmjs.com/package/@aid-on/nagare" target="_blank">npm</a> •
-        <a href="https://github.com/Aid-On/nagare#readme" target="_blank">Documentation</a>
-      </p>
-    </footer>
-  </div>
+      <div class="code-example">
+        <div class="code-header">Advanced Pipeline - Data Processing</div>
+        <div class="code-content">
+<pre>// Real-world data processing
+const processed = await Nagare
+  .from(apiResponse.data)
+  .filter(item => item.active)
+  .map(item => ({
+    ...item,
+    score: calculateScore(item),
+    timestamp: Date.now()
+  }))
+  .filter(item => item.score > threshold)
+  .scan((acc, item) => acc + item.score, 0)
+  .toArray();
 
+console.log('Total score:', processed[processed.length - 1]);</pre>
+        </div>
+      </div>
+
+      <div class="code-example">
+        <div class="code-header">Error Handling - Resilient Streams</div>
+        <div class="code-content">
+<pre>// Handle errors gracefully
+const safeResult = await Nagare
+  .from(['1', 'invalid', '3', null, '5'])
+  .map(x => parseInt(x))
+  .rescue(error => {
+    console.warn('Parse error:', error);
+    return 0; // Default value
+  })
+  .filter(x => x > 0)
+  .toArray();
+
+console.log(safeResult); // [1, 3, 5]</pre>
+        </div>
+      </div>
+
+      <div class="code-example">
+        <div class="code-header">Stream Merging - Multiple Sources</div>
+        <div class="code-content">
+<pre>// Merge multiple data streams
+const stream1 = Nagare.from([1, 3, 5]);
+const stream2 = Nagare.from([2, 4, 6]);
+const stream3 = Nagare.from([7, 8, 9]);
+
+const merged = await stream1
+  .merge(stream2, stream3)
+  .filter(x => x % 2 === 0)
+  .map(x => x * 10)
+  .toArray();
+
+console.log(merged); // [20, 40, 60, 80]</pre>
+        </div>
+      </div>
+
+      <div class="code-example">
+        <div class="code-header">Real-time Stream - Live Processing</div>
+        <div class="code-content">
+<pre>// Process real-time data
+const liveStream = Nagare
+  .interval(1000) // Every second
+  .map(() => Math.random() * 100)
+  .filter(x => x > 50)
+  .scan((acc, x) => acc + x, 0)
+  .take(10);
+
+// Subscribe to results
+liveStream.observe(
+  value => console.log('Current total:', value),
+  {
+    onComplete: () => console.log('Stream completed'),
+    onError: err => console.error('Stream error:', err)
+  }
+);</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- API Section -->
+    <section class="section" id="api">
+      <div class="section-header">
+        <h2 class="section-title">📖 API Reference</h2>
+        <p class="section-subtitle">
+          Complete reference for all Nagare methods and operators.
+          Everything you need to build powerful stream processing applications.
+        </p>
+      </div>
+
+      <div class="api-grid">
+        <div class="api-section">
+          <div class="api-header">🔧 Core Methods</div>
+          <div class="api-methods">
+            <div class="api-method">
+              <div>
+                <div class="method-name">from(source)</div>
+                <div class="method-desc">Create stream from data</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">map(fn)</div>
+                <div class="method-desc">Transform each element</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">filter(predicate)</div>
+                <div class="method-desc">Filter elements</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">scan(fn, initial)</div>
+                <div class="method-desc">Accumulate values</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">take(n)</div>
+                <div class="method-desc">Take first n elements</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">skip(n)</div>
+                <div class="method-desc">Skip first n elements</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <div class="api-header">⚡ Utility Methods</div>
+          <div class="api-methods">
+            <div class="api-method">
+              <div>
+                <div class="method-name">toArray()</div>
+                <div class="method-desc">Collect to array</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">first()</div>
+                <div class="method-desc">Get first element</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">last()</div>
+                <div class="method-desc">Get last element</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">count()</div>
+                <div class="method-desc">Count elements</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">all(predicate)</div>
+                <div class="method-desc">Test all elements</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">some(predicate)</div>
+                <div class="method-desc">Test any element</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <div class="api-header">🔄 Stream Operations</div>
+          <div class="api-methods">
+            <div class="api-method">
+              <div>
+                <div class="method-name">merge(...streams)</div>
+                <div class="method-desc">Merge streams</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">fork(predicate)</div>
+                <div class="method-desc">Split into two streams</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">observe(callback)</div>
+                <div class="method-desc">Subscribe to values</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">toReadableStream()</div>
+                <div class="method-desc">Convert to ReadableStream</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <div class="api-header">🛡️ Error Handling</div>
+          <div class="api-methods">
+            <div class="api-method">
+              <div>
+                <div class="method-name">rescue(handler)</div>
+                <div class="method-desc">Error recovery</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">terminateOnErrorMode()</div>
+                <div class="method-desc">Stop on error</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <div class="api-header">🚀 Advanced Features</div>
+          <div class="api-methods">
+            <div class="api-method">
+              <div>
+                <div class="method-name">windowedAggregate(size, op)</div>
+                <div class="method-desc">Rolling window operations</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">mapWasm(kernel, params)</div>
+                <div class="method-desc">WASM acceleration</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <div class="api-header">🏗️ Static Constructors</div>
+          <div class="api-methods">
+            <div class="api-method">
+              <div>
+                <div class="method-name">Nagare.from(source)</div>
+                <div class="method-desc">Create from source</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">Nagare.of(...values)</div>
+                <div class="method-desc">Create from values</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">Nagare.empty()</div>
+                <div class="method-desc">Create empty stream</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">Nagare.range(start, end)</div>
+                <div class="method-desc">Create number range</div>
+              </div>
+            </div>
+            <div class="api-method">
+              <div>
+                <div class="method-name">Nagare.interval(ms)</div>
+                <div class="method-desc">Create timer stream</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
   <script>
-    // Toggle code sample visibility (no global event dependency)
-    function toggleCode(id, btn) {
-      const codeElement = document.getElementById(id);
-      const button = btn;
-      if (!codeElement || !button) return;
+    // Import Nagare and setup
+    let Nagare;
+    import('./assets/nagare-Blca_Ns2.mjs').then(module => {
+      Nagare = module.Nagare;
+      console.log('Nagare loaded successfully');
+    });
 
-      const visible = codeElement.classList.toggle('visible');
-      button.textContent = visible ? 'Hide Code' : 'Show Code';
+    // Tab Navigation
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const sectionName = tab.dataset.section;
+        
+        // Update tabs
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Update sections
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(sectionName).classList.add('active');
+      });
+    });
+
+    // Benchmark functionality
+    document.getElementById('runBenchmark').addEventListener('click', runBenchmark);
+
+    async function runBenchmark() {
+      const btn = document.getElementById('runBenchmark');
+      const testType = document.getElementById('testType').value;
+      const dataSize = parseInt(document.getElementById('dataSize').value);
+      const status = document.getElementById('benchmarkStatus');
+      const resultsTable = document.getElementById('resultsTable');
+      const summary = document.getElementById('performanceSummary');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span> Running...';
+      status.innerHTML = '<div class="status info">🏃‍♂️ Running benchmark...</div>';
+
+      try {
+        const data = Array.from({ length: dataSize }, (_, i) => i);
+        let nativeResult, rxjsResult, nagareResult;
+        let nativeTime, rxjsTime, nagareTime;
+
+        // Native JS
+        const nativeStart = performance.now();
+        if (testType === 'mapFilter') {
+          nativeResult = data.map(x => x * 2).filter(x => x % 3 === 0);
+        } else if (testType === 'complex') {
+          let acc = 0;
+          nativeResult = data
+            .map(x => Math.sqrt(x))
+            .filter(x => x > 10)
+            .map(x => Math.floor(x * 100))
+            .map(x => acc += x)
+            .filter(x => x % 2 === 0);
+        } else if (testType === 'large') {
+          nativeResult = data.map(x => x * 3).filter(x => x % 5 === 0);
+        } else {
+          const objects = data.map(i => ({ id: i, value: Math.random() * 1000, active: i % 2 === 0 }));
+          nativeResult = objects
+            .filter(obj => obj.active)
+            .map(obj => ({ ...obj, value: obj.value * 1.1 }))
+            .filter(obj => obj.value > 100)
+            .map(obj => obj.value);
+          data.splice(0); // Use objects for other tests too
+          data.push(...objects);
+        }
+        nativeTime = performance.now() - nativeStart;
+
+        // RxJS
+        const rxjsStart = performance.now();
+        if (testType === 'mapFilter') {
+          rxjsResult = await rxjs.firstValueFrom(
+            rxjs.from(data).pipe(
+              rxjs.operators.map(x => x * 2),
+              rxjs.operators.filter(x => x % 3 === 0),
+              rxjs.operators.toArray()
+            )
+          );
+        } else if (testType === 'complex') {
+          rxjsResult = await rxjs.firstValueFrom(
+            rxjs.from(data).pipe(
+              rxjs.operators.map(x => Math.sqrt(x)),
+              rxjs.operators.filter(x => x > 10),
+              rxjs.operators.map(x => Math.floor(x * 100)),
+              rxjs.operators.scan((acc, x) => acc + x, 0),
+              rxjs.operators.filter(x => x % 2 === 0),
+              rxjs.operators.toArray()
+            )
+          );
+        } else if (testType === 'large') {
+          rxjsResult = await rxjs.firstValueFrom(
+            rxjs.from(data).pipe(
+              rxjs.operators.map(x => x * 3),
+              rxjs.operators.filter(x => x % 5 === 0),
+              rxjs.operators.toArray()
+            )
+          );
+        } else {
+          rxjsResult = await rxjs.firstValueFrom(
+            rxjs.from(data).pipe(
+              rxjs.operators.filter(obj => obj.active),
+              rxjs.operators.map(obj => ({ ...obj, value: obj.value * 1.1 })),
+              rxjs.operators.filter(obj => obj.value > 100),
+              rxjs.operators.map(obj => obj.value),
+              rxjs.operators.toArray()
+            )
+          );
+        }
+        rxjsTime = performance.now() - rxjsStart;
+
+        // Nagare
+        const nagareStart = performance.now();
+        if (testType === 'mapFilter') {
+          nagareResult = await Nagare.from(data)
+            .map(x => x * 2)
+            .filter(x => x % 3 === 0)
+            .toArray();
+        } else if (testType === 'complex') {
+          nagareResult = await Nagare.from(data)
+            .map(x => Math.sqrt(x))
+            .filter(x => x > 10)
+            .map(x => Math.floor(x * 100))
+            .scan((acc, x) => acc + x, 0)
+            .filter(x => x % 2 === 0)
+            .toArray();
+        } else if (testType === 'large') {
+          nagareResult = await Nagare.from(data)
+            .map(x => x * 3)
+            .filter(x => x % 5 === 0)
+            .toArray();
+        } else {
+          nagareResult = await Nagare.from(data)
+            .filter(obj => obj.active)
+            .map(obj => ({ ...obj, value: obj.value * 1.1 }))
+            .filter(obj => obj.value > 100)
+            .map(obj => obj.value)
+            .toArray();
+        }
+        nagareTime = performance.now() - nagareStart;
+
+        // Calculate results
+        const results = [
+          { name: 'nagare', time: nagareTime, label: '🚀 Nagare' },
+          { name: 'native', time: nativeTime, label: '🟦 Native JS' },
+          { name: 'rxjs', time: rxjsTime, label: '🟨 RxJS' }
+        ].sort((a, b) => a.time - b.time);
+
+        const medals = ['gold', 'silver', 'bronze'];
+        
+        // Update table
+        results.forEach((result, index) => {
+          document.getElementById(result.name + 'Time').textContent = result.time.toFixed(2) + 'ms';
+          document.getElementById(result.name + 'Throughput').textContent = 
+            (dataSize / result.time / 1000).toFixed(0) + 'M ops/s';
+          
+          const medal = document.getElementById(result.name + 'Medal');
+          medal.textContent = index === 0 ? '🥇 Champion' : index === 1 ? '🥈 Runner-up' : '🥉 Third';
+          medal.className = 'medal ' + medals[index];
+        });
+
+        // Show results
+        resultsTable.style.display = 'table';
+        summary.style.display = 'block';
+
+        // Summary message
+        const winner = results[0];
+        const speedupVsSecond = (results[1].time / winner.time).toFixed(1);
+        const speedupVsThird = (results[2].time / winner.time).toFixed(1);
+        
+        if (winner.name === 'nagare') {
+          document.getElementById('summaryText').innerHTML = 
+            `🎉 <strong>Nagare wins!</strong> ${speedupVsSecond}x faster than ${results[1].label} and ${speedupVsThird}x faster than ${results[2].label}`;
+        } else {
+          document.getElementById('summaryText').innerHTML = 
+            `🏆 <strong>${winner.label} wins!</strong> Beat Nagare by ${(nagareTime / winner.time).toFixed(1)}x`;
+        }
+
+        status.innerHTML = '<div class="status success">✅ Benchmark completed successfully</div>';
+
+      } catch (error) {
+        status.innerHTML = '<div class="status error">❌ Benchmark failed: ' + error.message + '</div>';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🚀 Run Benchmark';
+      }
     }
+
+    // Feature demos
+    document.getElementById('runTransform').addEventListener('click', () => {
+      const input = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      const result = input.map(x => x * 2).filter(x => x % 3 === 0);
+      document.getElementById('transformResult').textContent = JSON.stringify(result);
+    });
+
+    // Real-time stream demo
+    let realtimeSubscription = null;
+    document.getElementById('startRealtime').addEventListener('click', () => {
+      if (realtimeSubscription) return;
+      
+      let count = 0;
+      const startTime = Date.now();
+      
+      document.getElementById('streamStatus').textContent = 'Active';
+      
+      realtimeSubscription = setInterval(() => {
+        count++;
+        const value = Math.floor(Math.random() * 1000);
+        const rate = Math.floor(count / (Date.now() - startTime) * 1000);
+        
+        document.getElementById('itemCount').textContent = count;
+        document.getElementById('currentValue').textContent = value;
+        document.getElementById('processRate').textContent = rate;
+      }, 100);
+    });
+
+    document.getElementById('stopRealtime').addEventListener('click', () => {
+      if (realtimeSubscription) {
+        clearInterval(realtimeSubscription);
+        realtimeSubscription = null;
+        document.getElementById('streamStatus').textContent = 'Stopped';
+      }
+    });
+
+    // Other demo handlers
+    document.getElementById('runMerge').addEventListener('click', () => {
+      document.getElementById('streamA').textContent = '[1, 3, 5]';
+      document.getElementById('streamB').textContent = '[2, 4, 6]';
+      document.getElementById('streamC').textContent = '[7, 8, 9]';
+      document.getElementById('mergedResult').textContent = '[1, 2, 3, 4, 5, 6, 7, 8, 9]';
+    });
+
+    document.getElementById('runError').addEventListener('click', () => {
+      // Demo is static for now
+    });
+
+    document.getElementById('runWindow').addEventListener('click', () => {
+      // Demo is static for now
+    });
+
+    document.getElementById('runOperators').addEventListener('click', () => {
+      document.getElementById('operatorResult').textContent = '[3, 6, 10, 15, 21]';
+    });
   </script>
 </body>
 </html>
