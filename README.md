@@ -1,7 +1,7 @@
 # 🌊 Nagare (流れ)
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/aid-on/nagare/main/assets/nagare-logo.png" alt="Nagare Logo" width="600" />
+  <img src="assets/nagare-hero.png" alt="Nagare - A flowing river through mountains, representing the seamless flow of data streams" width="100%" style="max-width: 800px; border-radius: 8px; margin-bottom: 20px;" />
   
   <h3>WASM-first, stream-centric library for high-performance edge computing</h3>
   
@@ -14,15 +14,12 @@
 
 ---
 
-> **nagare** (流れ) - "flow" in Japanese, representing the seamless flow of data through reactive streams
+> **nagare** (流れ) - "flow" in Japanese  
+> *Like a river carving its path through mountains, Nagare guides your data streams with grace and power*
 
 Nagare is a next-generation stream processing library that delivers **5-10x performance** improvements over traditional JavaScript stream libraries. Built with Rust/WASM for compute-heavy workloads, SIMD acceleration, and designed specifically for edge computing environments like Cloudflare Workers.
 
 ## ⚡ Performance First
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/aid-on/nagare/main/assets/benchmark-chart.png" alt="Performance Benchmark" width="700" />
-</div>
 
 ```
 🏆 Benchmark Results (vs RxJS)
@@ -285,10 +282,6 @@ const combined = river.combine(temperature, humidity, pressure)
 ```
 
 ## 🏗️ Architecture
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/aid-on/nagare/main/assets/architecture.png" alt="Architecture" width="600" />
-</div>
 
 ```
 ┌─────────────────────────────────────────────────┐
