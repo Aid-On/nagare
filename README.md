@@ -2,7 +2,7 @@
 
 <div align="center">
 
-  ![Nagare Header](./docs/header.svg)
+  ![Nagare Header](./docs/header.png)
   
   <h3>WASM-first, stream-centric library for high-performance edge computing</h3>
   
