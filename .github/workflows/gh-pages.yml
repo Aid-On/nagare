@@ -6,6 +6,8 @@ on:
     paths:
       - 'demo/**'
       - 'src/**'
+      - 'Cargo.toml'
+      - '.github/workflows/**'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.ts'
