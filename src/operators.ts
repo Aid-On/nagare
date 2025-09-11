@@ -61,13 +61,16 @@ export function buffer<T>(size: number) {
         buffer.push(value);
         
         if (buffer.length >= size) {
-          yield [...buffer];
-          buffer = [];
+          const out = buffer.slice();
+          buffer.length = 0;
+          yield out;
         }
       }
 
       if (buffer.length > 0) {
-        yield buffer;
+        const out = buffer.slice();
+        buffer.length = 0;
+        yield out;
       }
     };
     return new Nagare<T[]>(generator());
@@ -82,8 +85,8 @@ export function bufferTime<T>(ms: number) {
 
       const flush = () => {
         if (buffer.length > 0) {
-          const toYield = [...buffer];
-          buffer = [];
+          const toYield = buffer.slice();
+          buffer.length = 0;
           return toYield;
         }
         return null;

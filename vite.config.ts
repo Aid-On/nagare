@@ -23,6 +23,8 @@ export default defineConfig({
         globals: {
           '@cloudflare/workers-types': 'CloudflareWorkersTypes',
         },
+        // Avoid warning: entry uses named and default exports together
+        exports: 'named',
       },
     },
     

@@ -1,5 +1,12 @@
 import type { Disposable, Subscription, ErrorHandler } from './types';
 import { loadWasm, wasmModule } from './wasm-loader';
+import { isTypedArrayLike } from './internal/helpers';
+import { 
+  compileOperatorChain as _compileOperatorChain,
+  compileOperatorChainUnchecked as _compileOperatorChainUnchecked,
+  compileArrayKernelUnchecked as _compileArrayKernelUnchecked,
+  compileArrayKernelUncheckedUnrolled as _compileArrayKernelUncheckedUnrolled,
+} from './internal/compile';
 
 export class Nagare<T, E = never> implements AsyncIterable<T> {
   protected source: AsyncIterable<T> | Iterable<T> | ReadableStream<T>;
@@ -7,6 +14,23 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   protected errorHandler?: ErrorHandler<E>;
   protected terminateOnError = false;
   private _originalArraySource?: any[];
+  private static readonly ASYNC_DETECTED = Symbol('nagare_async_detected');
+  // typed array detection moved to helper
+
+  // JIT モード制御（heavy JIT を無効化可能）
+  // 'fast': new Function によるJITを許可
+  // 'off' : new Function 不使用（安全だがやや低速）。融合のクロージャ版は継続利用。
+  static _jitMode: 'fast' | 'off' = 'fast';
+  static setJitMode(mode: 'fast' | 'off') { Nagare._jitMode = mode; }
+  static getJitMode(): 'fast' | 'off' { return Nagare._jitMode; }
+  static {
+    try {
+      const disabled = (typeof process !== 'undefined' && (process as any).env?.NAGARE_DISABLE_JIT === 'true')
+        || (typeof globalThis !== 'undefined' && (globalThis as any).NAGARE_DISABLE_JIT === true)
+        || (typeof globalThis !== 'undefined' && (globalThis as any).__NAGARE_JIT_MODE === 'off');
+      if (disabled) Nagare._jitMode = 'off';
+    } catch {}
+  }
 
   constructor(source: AsyncIterable<T> | Iterable<T> | ReadableStream<T> | T[]) {
     if (Array.isArray(source)) {
@@ -142,8 +166,72 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     }
   }
 
+  // Flatten a chain of Nagare sources into a single base source and full operator list
+  private flattenChain(): {
+    baseSource: AsyncIterable<T> | Iterable<T> | ReadableStream<T> | T[];
+    operators: Array<(value: T) => T | Promise<T> | undefined>;
+    errorHandler?: ErrorHandler<E>;
+    terminateOnError: boolean;
+  } {
+    let node: Nagare<T, E> = this;
+    const chain: Nagare<T, E>[] = [];
+    let base: any = undefined;
+
+    // Walk down the chain until the base non-Nagare source
+    while (node instanceof Nagare) {
+      chain.push(node);
+      const src: any = (node as any).source;
+      if (src instanceof Nagare) {
+        node = src as Nagare<T, E>;
+      } else {
+        base = src;
+        break;
+      }
+    }
+
+    // Aggregate operators in correct order: inner-most first → outer-most last
+    const ops: Array<(value: T) => T | Promise<T> | undefined> = [];
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const n = chain[i];
+      if (n.operators && n.operators.length > 0) {
+        ops.push(...n.operators as any);
+      }
+    }
+
+    // The outer-most error handler governs behavior
+    const top = chain[0];
+    return {
+      baseSource: base,
+      operators: ops,
+      errorHandler: top?.errorHandler,
+      terminateOnError: !!top?.terminateOnError,
+    };
+  }
+
+  private hasStatefulOps(ops: Array<any>): boolean {
+    for (const op of ops as any[]) {
+      const meta = (op as any)?.__nagareOp as { kind?: string } | undefined;
+      if (!meta) continue;
+      if (meta.kind === 'scan' || meta.kind === 'take' || meta.kind === 'skip') return true;
+    }
+    return false;
+  }
+
+  // reserved for future granular checks
+  // private hasOpKind(ops: Array<any>, kind: 'scan' | 'take' | 'skip' | 'filter' | 'map'): boolean {
+  //   for (const op of ops as any[]) {
+  //     const meta = (op as any)?.__nagareOp as { kind?: string } | undefined;
+  //     if (meta?.kind === kind) return true;
+  //   }
+  //   return false;
+  // }
+
   map<U>(fn: (value: T) => U | Promise<U>): Nagare<U, E> {
     const newNagare = new Nagare<U, E>(this as any);
+    // Tag operator for compilation metadata (respect existing tags e.g. scan)
+    if (!(fn as any).__nagareOp) {
+      (fn as any).__nagareOp = { kind: 'map' } as const;
+    }
     newNagare.operators = [...this.operators, fn as any];
     newNagare.errorHandler = this.errorHandler;
     newNagare.terminateOnError = this.terminateOnError;
@@ -160,6 +248,8 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
       }
       return result ? value : undefined;
     };
+    // Tag operator for compilation metadata, preserving original predicate
+    (filterOp as any).__nagareOp = { kind: 'filter', predicate } as const;
     newNagare.operators = [...this.operators, filterOp as any];
     newNagare.errorHandler = this.errorHandler;
     newNagare.terminateOnError = this.terminateOnError;
@@ -172,28 +262,54 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     initial: U
   ): Nagare<U, E> {
     let accumulator = initial;
-    return this.map((value) => {
+    const mapper = (value: T) => {
       const result = fn(accumulator, value);
       if (result instanceof Promise) {
         return result.then(res => {
           accumulator = res;
-          return accumulator;
-        });
+          return accumulator as any;
+        }) as any;
       } else {
         accumulator = result;
-        return accumulator;
+        return accumulator as any;
       }
-    });
+    };
+    (mapper as any).__nagareOp = { kind: 'scan', scanFn: fn, initial } as const;
+    return this.map(mapper as any);
   }
 
   take(count: number): Nagare<T, E> {
+    const newNagare = new Nagare<T, E>(this);
     let taken = 0;
-    return this.filter(() => taken++ < count);
+    const op = (value: T): T | undefined => {
+      if (taken >= count) return undefined;
+      taken++;
+      return value;
+    };
+    (op as any).__nagareOp = { kind: 'take', n: count } as const;
+    newNagare.operators = [...this.operators, op as any];
+    newNagare.errorHandler = this.errorHandler;
+    newNagare.terminateOnError = this.terminateOnError;
+    newNagare._originalArraySource = this._originalArraySource;
+    return newNagare;
   }
 
   skip(count: number): Nagare<T, E> {
+    const newNagare = new Nagare<T, E>(this);
     let skipped = 0;
-    return this.filter(() => ++skipped > count);
+    const op = (value: T): T | undefined => {
+      if (skipped < count) {
+        skipped++;
+        return undefined;
+      }
+      return value;
+    };
+    (op as any).__nagareOp = { kind: 'skip', n: count } as const;
+    newNagare.operators = [...this.operators, op as any];
+    newNagare.errorHandler = this.errorHandler;
+    newNagare.terminateOnError = this.terminateOnError;
+    newNagare._originalArraySource = this._originalArraySource;
+    return newNagare;
   }
 
   fork(predicate: (value: T) => boolean): [Nagare<T, E>, Nagare<T, E>] {
@@ -261,41 +377,70 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   }
 
   windowedAggregate(windowSize: number, operation: string): Nagare<number, E> {
-    let window: number[] = [];
+    if (windowSize <= 0) throw new Error('windowSize must be > 0');
     const self = this;
-    
+
     const generator = async function* (): AsyncGenerator<number> {
+      // Circular buffer to avoid shift()と新規配列の作成
+      const buf = new Array<number>(windowSize);
+      let start = 0;      // oldest index
+      let count = 0;      // current count (<= windowSize)
+      let sum = 0;        // for sum/mean
+
       for await (const value of self) {
         if (typeof value !== 'number') {
           throw new Error('windowedAggregate requires numeric values');
         }
-        
-        window.push(value);
-        
-        if (window.length === windowSize) {
+
+        const idx = (start + count) % windowSize;
+        if (count < windowSize) {
+          buf[idx] = value;
+          count++;
+          sum += value;
+        } else {
+          // Overwrite oldest
+          const oldest = buf[start];
+          buf[start] = value;
+          start = (start + 1) % windowSize;
+          sum += value - oldest;
+        }
+
+        if (count === windowSize) {
           let result: number;
           switch (operation) {
             case 'mean':
-              result = window.reduce((a, b) => a + b, 0) / window.length;
+              result = sum / windowSize;
               break;
             case 'sum':
-              result = window.reduce((a, b) => a + b, 0);
+              result = sum;
               break;
-            case 'max':
-              result = Math.max(...window);
+            case 'max': {
+              // 線形スキャン（テスト規模では十分）。必要ならデックで最適化可能。
+              let m = -Infinity;
+              for (let i = 0; i < windowSize; i++) {
+                const v = buf[(start + i) % windowSize];
+                if (v > m) m = v;
+              }
+              result = m;
               break;
-            case 'min':
-              result = Math.min(...window);
+            }
+            case 'min': {
+              let m = Infinity;
+              for (let i = 0; i < windowSize; i++) {
+                const v = buf[(start + i) % windowSize];
+                if (v < m) m = v;
+              }
+              result = m;
               break;
+            }
             default:
               throw new Error(`Unknown operation: ${operation}`);
           }
           yield result;
-          window.shift(); // Remove first element for sliding window
         }
       }
     };
-    
+
     return new Nagare<number, E>(generator());
   }
 
@@ -337,6 +482,90 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   }
 
   async *[Symbol.asyncIterator](): AsyncIterator<T> {
+    // Iterator Fusion fast-path: if underlying base is an array and all ops are sync
+    const { baseSource, operators: fusedOps, errorHandler, terminateOnError } = this.flattenChain();
+    if ((Array.isArray(baseSource) || isTypedArrayLike(baseSource)) && fusedOps.length > 0) {
+      try {
+        const fused = _compileOperatorChain(
+          fusedOps as any,
+          errorHandler as any,
+          terminateOnError,
+          { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+        );
+        if (fused) {
+          const data = baseSource as any;
+          const stateful = this.hasStatefulOps(fusedOps);
+          // If no error handling and no stateful ops, run one checked iteration then unchecked fast path
+          if (!errorHandler && !terminateOnError && !stateful) {
+            const fast = _compileOperatorChainUnchecked(
+              fusedOps as any,
+              { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+            );
+            if (data.length > 0) {
+              try {
+                const first = fused(data[0]);
+                if (first !== undefined) yield first as T;
+              } catch (err) {
+                if (err === Nagare.ASYNC_DETECTED) {
+                  const rest = new Nagare<T, E>(data);
+                  (rest as any).operators = fusedOps as any;
+                  for await (const v of rest) yield v;
+                  return;
+                }
+                throw err;
+              }
+            }
+            // Use unrolled kernel only for very large inputs to reduce loop overhead
+            const kernel = (Nagare._jitMode === 'fast' && data.length >= 200_000)
+              ? _compileArrayKernelUncheckedUnrolled(
+                  fusedOps as any,
+                  4,
+                  { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+                )
+              : null;
+            if (kernel) {
+              const outArr: T[] = new Array<T>(data.length - 1);
+              let k = 0;
+              k = kernel(data as any[], 1, outArr as any[], k) as number;
+              for (let j = 0; j < k; j++) {
+                yield outArr[j] as T;
+              }
+            } else {
+              for (let i = 1; i < data.length; i++) {
+                const out = fast(data[i]);
+                if (out !== undefined) yield out as T;
+              }
+            }
+            return;
+          } else {
+            // Use guarded fused function for all elements to preserve stateful semantics
+            for (let i = 0; i < data.length; i++) {
+              try {
+                const out = fused(data[i]);
+                if (out !== undefined) yield out as T;
+              } catch (err) {
+                if (err === Nagare.ASYNC_DETECTED) {
+                  // Fallback: process remaining elements with generic async pipeline
+                  const rest = new Nagare<T, E>(Array.prototype.slice.call(data, i));
+                  (rest as any).operators = fusedOps as any;
+                  (rest as any).errorHandler = errorHandler as any;
+                  (rest as any).terminateOnError = terminateOnError;
+                  for await (const v of rest) {
+                    yield v;
+                  }
+                  return;
+                }
+                throw err;
+              }
+            }
+            return;
+          }
+        }
+      } catch {
+        // fall through to generic paths
+      }
+    }
+
     if (this.source instanceof Nagare) {
       // Handle nested Nagare sources (from chained operations like rescue, map, etc.)
       // Propagate error handler to the source river to ensure errors are caught at the right level
@@ -412,23 +641,95 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
   }
 
   async toArray(): Promise<T[]> {
-    // Operator Fusion: Compile operator chain into single optimized function
-    if (Array.isArray(this.source) && this.operators.length > 0) {
+    // Flatten chain first for maximal fusion opportunities
+    const { baseSource, operators: fusedOps, errorHandler, terminateOnError } = this.flattenChain();
+    // Operator Fusion: Compile operator chain into single optimized function when possible
+    if ((Array.isArray(baseSource) || isTypedArrayLike(baseSource)) && fusedOps.length > 0) {
       try {
-        // Compile operators into fused function
-        const fusedOperator = this.compileOperatorChain();
-        if (!fusedOperator) throw new Error('compilation-failed');
-        
-        // Execute fused operation - single pass through data
-        const result: T[] = [];
-        for (let i = 0; i < this.source.length; i++) {
-          const processed = fusedOperator(this.source[i]);
-          if (processed !== undefined) {
-            result.push(processed);
+        const fused = _compileOperatorChain(
+          fusedOps as any,
+          errorHandler as any,
+          terminateOnError,
+          { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+        );
+        if (!fused) throw new Error('compilation-failed');
+
+        // Single-pass execution without intermediate arrays
+        const src = baseSource as any;
+        const result = new Array<T>(src.length); // pre-allocate; we will adjust length
+        let k = 0;
+        const stateful = this.hasStatefulOps(fusedOps);
+        if (!errorHandler && !terminateOnError && !stateful) {
+          const fast = _compileOperatorChainUnchecked(
+            fusedOps as any,
+            { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+          );
+          let startIndex = 0;
+          if (src.length > 0) {
+            try {
+              const out0 = fused(src[0]);
+              if (out0 !== undefined) result[k++] = out0 as T;
+            } catch (err) {
+              if (err === Nagare.ASYNC_DETECTED) {
+                const rest = new Nagare<T, E>(Array.prototype.slice.call(src));
+                (rest as any).operators = fusedOps as any;
+                for await (const v of rest) result[k++] = v;
+                (result as any).length = k;
+                return result;
+              }
+              throw err;
+            }
+            startIndex = 1;
+          }
+          // Use compiled array kernel; prefer unrolled only for very large inputs
+          let kernel: ((src: any[], start: number, out: any[], k: number) => number) | null = null;
+          if (Nagare._jitMode === 'fast' && src.length >= 200_000) {
+            kernel = _compileArrayKernelUncheckedUnrolled(
+              fusedOps as any,
+              4,
+              { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+            );
+          }
+          if (!kernel) {
+            kernel = _compileArrayKernelUnchecked(
+              fusedOps as any,
+              { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+            );
+          }
+          if (kernel) {
+            k = kernel(src as any[], startIndex, result as any[], k) as number;
+          } else {
+            for (let i = startIndex; i < src.length; i++) {
+              const out = fast(src[i]);
+              if (out !== undefined) result[k++] = out as T;
+            }
+          }
+        } else {
+          // Use guarded fused function for all elements to preserve stateful semantics
+          for (let i = 0; i < src.length; i++) {
+            try {
+              const out = fused(src[i]);
+              if (out !== undefined) {
+                result[k++] = out as T;
+              }
+            } catch (err) {
+              if (err === Nagare.ASYNC_DETECTED) {
+                // Continue remaining values with generic pipeline
+                const rest = new Nagare<T, E>(src.slice(i));
+                (rest as any).operators = fusedOps as any;
+                (rest as any).errorHandler = errorHandler as any;
+                (rest as any).terminateOnError = terminateOnError;
+                for await (const v of rest) {
+                  result[k++] = v;
+                }
+                break;
+              }
+              throw err;
+            }
           }
         }
-        
-        return result as T[];
+        (result as any).length = k;
+        return result;
       } catch (error) {
         // Fall back to standard iteration
       }
@@ -442,31 +743,6 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     return result;
   }
 
-  // Compile operator chain into single optimized function
-  private compileOperatorChain(): ((value: any) => any) | null {
-    try {
-      // Test all operators with a sample value to ensure they're sync
-      const testValue = Array.isArray(this.source) ? this.source[0] : null;
-      if (testValue === null || testValue === undefined) return null;
-      
-      for (const op of this.operators) {
-        const result = op(testValue);
-        if (result instanceof Promise) return null;
-      }
-      
-      // Create fused function that applies all operators in sequence
-      return (value: any) => {
-        let current = value;
-        for (const op of this.operators) {
-          current = op(current);
-          if (current === undefined) return undefined;
-        }
-        return current;
-      };
-    } catch (error) {
-      return null;
-    }
-  }
 
   async first(): Promise<T | undefined> {
     for await (const value of this) {
