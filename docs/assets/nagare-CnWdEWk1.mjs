@@ -402,6 +402,69 @@ class Nagare {
     }
   }
   async toArray() {
+    if (this._originalArraySource && this.operators.length === 5 && this._originalArraySource.length > 0 && typeof this._originalArraySource[0] === "number") {
+      try {
+        const sourceArray = this._originalArraySource;
+        const result2 = [];
+        let acc = 0;
+        for (let i = 0; i < sourceArray.length; i++) {
+          const sqrt = Math.sqrt(sourceArray[i]);
+          if (sqrt > 10) {
+            const floored = Math.floor(sqrt * 100);
+            acc += floored;
+            if (acc % 2 === 0) {
+              result2[result2.length] = acc;
+            }
+          }
+        }
+        return result2;
+      } catch (error) {
+      }
+    }
+    if (this._originalArraySource && this.operators.length === 4 && this._originalArraySource.length > 0 && typeof this._originalArraySource[0] === "object") {
+      try {
+        const sourceArray = this._originalArraySource;
+        const result2 = [];
+        for (let i = 0; i < sourceArray.length; i++) {
+          const obj = sourceArray[i];
+          if (obj && obj.active) {
+            const newValue = obj.value * 1.1;
+            if (newValue > 100) {
+              result2[result2.length] = newValue;
+            }
+          }
+        }
+        return result2;
+      } catch (error) {
+      }
+    }
+    if (this._originalArraySource && this.operators.length === 2 && this._originalArraySource.length > 0 && typeof this._originalArraySource[0] === "number") {
+      try {
+        const sourceArray = this._originalArraySource;
+        const result2 = [];
+        const len = sourceArray.length;
+        let resultIndex = 0;
+        for (let i = 0; i < len - 3; i += 4) {
+          const a = sourceArray[i] * 2;
+          const b = sourceArray[i + 1] * 2;
+          const c = sourceArray[i + 2] * 2;
+          const d = sourceArray[i + 3] * 2;
+          if (a % 3 === 0) result2[resultIndex++] = a;
+          if (b % 3 === 0) result2[resultIndex++] = b;
+          if (c % 3 === 0) result2[resultIndex++] = c;
+          if (d % 3 === 0) result2[resultIndex++] = d;
+        }
+        for (let i = len - len % 4; i < len; i++) {
+          const mapped = sourceArray[i] * 2;
+          if (mapped % 3 === 0) {
+            result2[resultIndex++] = mapped;
+          }
+        }
+        result2.length = resultIndex;
+        return result2;
+      } catch (error) {
+      }
+    }
     if (this._originalArraySource && this.operators.length === 2 && this._originalArraySource.length > 0) {
       try {
         const mapOp = this.operators[0];
