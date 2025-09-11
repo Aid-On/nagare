@@ -1,45 +1,53 @@
-name: Build Demo
+name: Deploy Demo to gh-pages
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
+    paths:
+      - 'demo/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'demo/vite.config.js'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          
+
       - name: Install dependencies
         run: npm ci
-        
-      - name: Create mock WASM package
+
+      - name: Mock WASM for demo build
         run: |
-          echo "Creating mock WASM package for demo"
           mkdir -p pkg
           echo '{"name": "nagare", "version": "0.1.0"}' > pkg/package.json
           echo 'export function process_float32_batch() { return []; }' > pkg/nagare.js
           echo 'export const wasmModule = {};' > pkg/index.js
-        
+
       - name: Build demo
         run: npm run demo:build
 
-      - name: Deploy to GitHub Pages (gh-pages)
+      - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
           publish_branch: gh-pages
+          publish_dir: docs

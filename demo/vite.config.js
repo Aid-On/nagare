@@ -6,7 +6,8 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   root: resolve(__dirname),
-  base: '/nagare/', // GitHub Pages URL path - https://aid-on.github.io/nagare/
+  // Use relative base so it works under any Pages path (repo or subfolder)
+  base: './',
   build: {
     outDir: resolve(__dirname, '../docs'), // Output to docs folder for GitHub Pages
     emptyOutDir: true,
