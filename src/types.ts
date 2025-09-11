@@ -8,7 +8,7 @@ export interface Subscription {
   readonly isActive: boolean;
 }
 
-export interface RiverOptions {
+export interface NagareOptions {
   signal?: AbortSignal;
   onError?: ErrorHandler<any>;
   onComplete?: () => void;
@@ -100,35 +100,35 @@ export interface SerializationConfig {
   compression?: boolean;
 }
 
-export type RiverSource<T> = 
+export type NagareSource<T> = 
   | AsyncIterable<T>
   | Iterable<T>
   | ReadableStream<T>
   | Promise<T>
   | T[];
 
-export interface RiverTransform<T, U> {
-  (river: River<T>): River<U>;
+export interface NagareTransform<T, U> {
+  (nagare: Nagare<T>): Nagare<U>;
 }
 
-export interface River<T, E = never> extends AsyncIterable<T> {
+export interface Nagare<T, E = never> extends AsyncIterable<T> {
   observe(
     next: (value: T) => void,
-    options?: RiverOptions
+    options?: NagareOptions
   ): Disposable & Subscription;
 
-  map<U>(fn: (value: T) => U | Promise<U>): River<U, E>;
-  filter(predicate: (value: T) => boolean | Promise<boolean>): River<T, E>;
-  scan<U>(fn: (acc: U, value: T) => U | Promise<U>, initial: U): River<U, E>;
-  take(count: number): River<T, E>;
-  skip(count: number): River<T, E>;
-  fork(predicate: (value: T) => boolean): [River<T, E>, River<T, E>];
-  merge<U>(...others: River<U, E>[]): River<T | U, E>;
-  rescue(handler: (error: unknown) => T | undefined): River<T, E>;
-  terminateOnErrorMode(): River<T, E>;
+  map<U>(fn: (value: T) => U | Promise<U>): Nagare<U, E>;
+  filter(predicate: (value: T) => boolean | Promise<boolean>): Nagare<T, E>;
+  scan<U>(fn: (acc: U, value: T) => U | Promise<U>, initial: U): Nagare<U, E>;
+  take(count: number): Nagare<T, E>;
+  skip(count: number): Nagare<T, E>;
+  fork(predicate: (value: T) => boolean): [Nagare<T, E>, Nagare<T, E>];
+  merge<U>(...others: Nagare<U, E>[]): Nagare<T | U, E>;
+  rescue(handler: (error: unknown) => T | undefined): Nagare<T, E>;
+  terminateOnErrorMode(): Nagare<T, E>;
   
-  mapWasm(kernelName: string, params?: any): Promise<River<T, E>>;
-  windowedAggregate(windowSize: number, operation: string): River<number, E>;
+  mapWasm(kernelName: string, params?: any): Promise<Nagare<T, E>>;
+  windowedAggregate(windowSize: number, operation: string): Nagare<number, E>;
   
   toReadableStream(): ReadableStream<T>;
   toArray(): Promise<T[]>;

@@ -2,10 +2,10 @@ import type { Disposable, Subscription, ErrorHandler } from './types';
 import { loadWasm, wasmModule } from './wasm-loader';
 
 export class Nagare<T, E = never> implements AsyncIterable<T> {
-  private source: AsyncIterable<T> | Iterable<T> | ReadableStream<T>;
-  private operators: Array<(value: T) => T | Promise<T> | undefined> = [];
-  private errorHandler?: ErrorHandler<E>;
-  private terminateOnError = false;
+  protected source: AsyncIterable<T> | Iterable<T> | ReadableStream<T>;
+  protected operators: Array<(value: T) => T | Promise<T> | undefined> = [];
+  protected errorHandler?: ErrorHandler<E>;
+  protected terminateOnError = false;
 
   constructor(source: AsyncIterable<T> | Iterable<T> | ReadableStream<T> | T[]) {
     if (Array.isArray(source)) {
@@ -45,9 +45,10 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
           if (!active || signal?.aborted || controller.signal.aborted) break;
           
           try {
-            const processed = await this.applyOperators(value);
-            if (processed !== undefined) {
-              next(processed);
+            const processed = this.applyOperators(value);
+            const result = processed instanceof Promise ? await processed : processed;
+            if (result !== undefined) {
+              next(result);
             }
           } catch (error) {
             if (options?.onError) {
@@ -74,7 +75,37 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     return subscription;
   }
 
-  private async applyOperators(value: T): Promise<T | undefined> {
+  private applyOperators(value: T): T | undefined | Promise<T | undefined> {
+    let current: T | undefined = value;
+    
+    for (const op of this.operators) {
+      if (current === undefined) break;
+      try {
+        const result = op(current);
+        if (result instanceof Promise) {
+          return this.applyOperatorsAsync(value);
+        }
+        current = result;
+      } catch (error) {
+        if (this.errorHandler) {
+          const recovered = this.errorHandler(error as E);
+          current = recovered as T | undefined;
+          if (current !== undefined) {
+            break;
+          }
+        } else if (this.terminateOnError) {
+          throw error;
+        } else {
+          current = undefined;
+          break;
+        }
+      }
+    }
+    
+    return current;
+  }
+
+  private async applyOperatorsAsync(value: T): Promise<T | undefined> {
     let current: T | undefined = value;
     
     for (const op of this.operators) {
@@ -86,15 +117,12 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
         if (this.errorHandler) {
           const recovered = this.errorHandler(error as E);
           current = recovered as T | undefined;
-          // If error handler returns a value, we should continue processing
-          // but break out of operator loop to yield this rescue value
           if (current !== undefined) {
             break;
           }
         } else if (this.terminateOnError) {
           throw error;
         } else {
-          // Default: continue with undefined to skip this value
           current = undefined;
           break;
         }
@@ -102,6 +130,14 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     }
     
     return current;
+  }
+
+  private async *asyncFallback(remaining: T[]): AsyncGenerator<T> {
+    for (const value of remaining) {
+      const processed = this.applyOperators(value);
+      const result = processed instanceof Promise ? await processed : processed;
+      if (result !== undefined) yield result;
+    }
   }
 
   map<U>(fn: (value: T) => U | Promise<U>): Nagare<U, E> {
@@ -114,10 +150,12 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
 
   filter(predicate: (value: T) => boolean | Promise<boolean>): Nagare<T, E> {
     const newNagare = new Nagare<T, E>(this);
-    const filterOp = async (value: T): Promise<T | undefined> => {
+    const filterOp = (value: T): T | undefined | Promise<T | undefined> => {
       const result = predicate(value);
-      const shouldKeep = result instanceof Promise ? await result : result;
-      return shouldKeep ? value : undefined;
+      if (result instanceof Promise) {
+        return result.then(shouldKeep => shouldKeep ? value : undefined);
+      }
+      return result ? value : undefined;
     };
     newNagare.operators = [...this.operators, filterOp as any];
     newNagare.errorHandler = this.errorHandler;
@@ -297,8 +335,9 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
       }
       
       for await (const value of this.source) {
-        const processed = await this.applyOperators(value);
-        if (processed !== undefined) yield processed;
+        const processed = this.applyOperators(value);
+        const result = processed instanceof Promise ? await processed : processed;
+        if (result !== undefined) yield result;
       }
     } else if (this.source instanceof ReadableStream) {
       const reader = this.source.getReader();
@@ -306,8 +345,9 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const processed = await this.applyOperators(value);
-          if (processed !== undefined) yield processed;
+          const processed = this.applyOperators(value);
+          const result = processed instanceof Promise ? await processed : processed;
+          if (result !== undefined) yield result;
         }
       } finally {
         reader.releaseLock();
@@ -316,23 +356,88 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
       // Handle AsyncGenerator functions (created by Nagare.from for promises, etc.)
       const generator = (this.source as () => AsyncGenerator<T>)();
       for await (const value of generator) {
-        const processed = await this.applyOperators(value);
-        if (processed !== undefined) yield processed;
+        const processed = this.applyOperators(value);
+        const result = processed instanceof Promise ? await processed : processed;
+        if (result !== undefined) yield result;
       }
     } else if (Symbol.asyncIterator in this.source) {
       for await (const value of this.source as AsyncIterable<T>) {
-        const processed = await this.applyOperators(value);
-        if (processed !== undefined) yield processed;
+        const processed = this.applyOperators(value);
+        const result = processed instanceof Promise ? await processed : processed;
+        if (result !== undefined) yield result;
       }
     } else if (Symbol.iterator in this.source) {
+      // Fast path for arrays
+      if (Array.isArray(this.source) && this.operators.length > 0) {
+        // Assume sync processing for arrays - check for async later if needed
+        try {
+          for (const value of this.source as T[]) {
+            let current: T | undefined = value;
+            for (const op of this.operators) {
+              if (current === undefined) break;
+              const result = op(current);
+              if (result instanceof Promise) {
+                // Fall back to async processing for the rest
+                yield* this.asyncFallback(this.source.slice(this.source.indexOf(value)));
+                return;
+              }
+              current = result as T | undefined;
+            }
+            if (current !== undefined) yield current;
+          }
+          return;
+        } catch (error) {
+          // Fall back to original logic on any error
+        }
+      }
+      
+      // Fallback to original logic
       for (const value of this.source as Iterable<T>) {
-        const processed = await this.applyOperators(value);
-        if (processed !== undefined) yield processed;
+        const processed = this.applyOperators(value);
+        const result = processed instanceof Promise ? await processed : processed;
+        if (result !== undefined) yield result;
       }
     }
   }
 
   async toArray(): Promise<T[]> {
+    // Aggressive optimization for synchronous array operations
+    if (Array.isArray(this.source) && this.operators.length > 0 && this.source.length > 0) {
+      try {
+        // Try to execute all operators synchronously on the array
+        let result: any[] = this.source;
+        
+        for (let opIndex = 0; opIndex < this.operators.length; opIndex++) {
+          const op = this.operators[opIndex];
+          const filtered: any[] = [];
+          
+          for (let i = 0; i < result.length; i++) {
+            try {
+              const processed = op(result[i]);
+              // If we get a Promise, fall back to async
+              if (processed instanceof Promise) {
+                throw new Error('async-fallback');
+              }
+              if (processed !== undefined) {
+                filtered.push(processed);
+              }
+            } catch (error: any) {
+              if (error?.message === 'async-fallback') {
+                throw error;
+              }
+              // Skip this item on other errors
+            }
+          }
+          result = filtered;
+        }
+        
+        return result as T[];
+      } catch (error) {
+        // Fall back to async processing
+      }
+    }
+
+    // Default async behavior
     const result: T[] = [];
     for await (const value of this) {
       result.push(value);

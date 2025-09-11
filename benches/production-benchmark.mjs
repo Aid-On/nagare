@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { River } from '../src/river.ts';
+import { Nagare } from '../dist/index.mjs';
 import * as rxjs from 'rxjs';
 import * as operators from 'rxjs/operators';
 
@@ -80,7 +80,7 @@ const benchmarks = async () => {
     'Simple Transformation (1M elements)',
     1_000_000,
     async () => {
-      const river = River.from(data1M)
+      const river = Nagare.from(data1M)
         .map(x => x * 2)
         .filter(x => x % 3 === 0);
       await river.toArray();
@@ -102,7 +102,7 @@ const benchmarks = async () => {
     'Heavy Computation Pipeline (500K elements)',
     500_000,
     async () => {
-      const river = River.from(data500K)
+      const river = Nagare.from(data500K)
         .map(x => Math.sqrt(x))
         .filter(x => x > 100)
         .map(x => Math.floor(x * 1000))
@@ -130,7 +130,7 @@ const benchmarks = async () => {
     'Batch Processing (2M elements, batch 1000)',
     2_000_000,
     async () => {
-      const river = River.from(data2M)
+      const river = Nagare.from(data2M)
         .buffer(1000)
         .map(batch => batch.reduce((a, b) => a + b, 0))
         .filter(sum => sum > 10000);
@@ -160,7 +160,7 @@ const benchmarks = async () => {
     'Real-world Data Pipeline (100K records)',
     100_000,
     async () => {
-      const river = River.from(records)
+      const river = Nagare.from(records)
         .filter(r => r.category !== 'B')
         .map(r => ({ ...r, value: r.value * 1.1 }))
         .filter(r => r.value > 100)
@@ -191,9 +191,9 @@ const benchmarks = async () => {
     'Stream Merging (3 × 100K elements)',
     300_000,
     async () => {
-      const r1 = River.from(stream1);
-      const r2 = River.from(stream2);
-      const r3 = River.from(stream3);
+      const r1 = Nagare.from(stream1);
+      const r2 = Nagare.from(stream2);
+      const r3 = Nagare.from(stream3);
       const merged = r1.merge(r2, r3)
         .filter(x => x % 2 === 0)
         .map(x => x * 2);

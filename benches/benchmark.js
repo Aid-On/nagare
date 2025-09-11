@@ -1,7 +1,7 @@
 import { performance } from 'perf_hooks';
 import { from, of, range } from 'rxjs';
 import { map, filter, scan, take } from 'rxjs/operators';
-import { river } from '../dist/index.mjs';
+import { nagare } from '../dist/index.mjs';
 import { loadWasm } from '../dist/wasm-loader.mjs';
 
 const ITERATIONS = 10;
@@ -46,7 +46,7 @@ async function benchmarkMapFilter() {
   const nagareTimes = [];
   for (let i = 0; i < ITERATIONS; i++) {
     const start = performance.now();
-    await river
+    await nagare
       .from(data)
       .map(x => x * 2)
       .filter(x => x % 3 === 0)
@@ -89,7 +89,7 @@ async function benchmarkFloat32Processing() {
   const nagareTimes = [];
   for (let i = 0; i < ITERATIONS; i++) {
     const start = performance.now();
-    const r = await river.from([data]).mapWasm('f32x_map_mul_add', { a: 2.5, b: 1.2 });
+    const r = await nagare.from([data]).mapWasm('f32x_map_mul_add', { a: 2.5, b: 1.2 });
     await r.toArray();
     const time = performance.now() - start;
     nagareTimes.push(time);
@@ -129,7 +129,7 @@ async function benchmarkWindowedAggregation() {
   const nagareTimes = [];
   for (let i = 0; i < ITERATIONS; i++) {
     const start = performance.now();
-    await river
+    await nagare
       .from(data)
       .windowedAggregate(windowSize, 'mean')
       .toArray();
@@ -174,8 +174,8 @@ async function benchmarkMergeStreams() {
   const nagareTimes = [];
   for (let i = 0; i < ITERATIONS; i++) {
     const start = performance.now();
-    const nagareStreams = streams.map(s => river.from(s));
-    await river.merge(...nagareStreams).toArray();
+    const nagareStreams = streams.map(s => nagare.from(s));
+    await nagare.merge(...nagareStreams).toArray();
     const time = performance.now() - start;
     nagareTimes.push(time);
   }
