@@ -2,7 +2,7 @@
 
 <div align="center">
 
-  <img src="https://aid-on.github.io/nagare/header.png" alt="Nagare Header" style="max-width: 100%; height: auto;" />
+  <img src="./docs/header.png" alt="Nagare Header" style="max-width: 100%; height: auto;" />
   
   <h3>WASM-first, stream-centric library for high-performance edge computing</h3>
   
