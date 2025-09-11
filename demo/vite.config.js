@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
+import wasm from 'vite-plugin-wasm';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -22,6 +23,7 @@ export default defineConfig({
       '@aid-on/nagare': resolve(__dirname, '../src/index.ts'),
     },
   },
+  plugins: [wasm()],
   optimizeDeps: {
     exclude: ['@aid-on/nagare'], // Exclude from pre-bundling to ensure WASM works
   },

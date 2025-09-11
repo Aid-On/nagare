@@ -44,25 +44,31 @@ export async function loadWasm(): Promise<void> {
       }
 
       if (typeof window !== 'undefined') {
-        // Browser environment - would load from pkg folder
-        // const module = await import('../pkg/nagare_bg.wasm');
-        // const wasm = await import('../pkg/nagare');
-        // await wasm.default(module.default);
-        // wasmModule = wasm;
-        console.warn('WASM loading in browser not yet configured');
-        wasmModule = createMockWasmModule();
+        // Browser: load wasm-pack (web target) output via Vite's wasm plugin
+        const wasm = await import('../pkg/nagare.js');
+        if (typeof (wasm as any).default === 'function') {
+          await (wasm as any).default();
+        }
+        wasmModule = wasm;
       } else if (typeof process !== 'undefined' && process.versions?.node) {
-        // Node.js environment - would load from pkg-node folder
-        // const wasm = await import('../pkg-node/nagare');
-        // wasmModule = wasm;
-        console.warn('WASM loading in Node.js not yet configured');
-        wasmModule = createMockWasmModule();
+        // Node.js: prefer web build if available (for SSR builds, Vite plugin handles assets). Fallback to mock.
+        try {
+          const wasm = await import('../pkg/nagare.js');
+          if (typeof (wasm as any).default === 'function') {
+            await (wasm as any).default();
+          }
+          wasmModule = wasm;
+        } catch {
+          console.warn('WASM (node) not configured, using mock');
+          wasmModule = createMockWasmModule();
+        }
       } else {
         // Other environment - would load from pkg folder
-        // const wasm = await import('../pkg/nagare');
-        // wasmModule = wasm;
-        console.warn('WASM loading not yet configured');
-        wasmModule = createMockWasmModule();
+        const wasm = await import('../pkg/nagare.js');
+        if (typeof (wasm as any).default === 'function') {
+          await (wasm as any).default();
+        }
+        wasmModule = wasm;
       }
     } catch (error) {
       if (isTestEnvironment()) {
