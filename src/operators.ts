@@ -2,33 +2,56 @@ import { Nagare } from './nagare';
 import { ensureWasmLoaded, wasmModule } from './wasm-loader';
 
 export function debounce<T>(ms: number) {
-  return (nagare: Nagare<T>): Nagare<T> => {
+  return (src: Nagare<T>): Nagare<T> => {
     const generator = async function* (): AsyncGenerator<T> {
-      let timeout: NodeJS.Timeout | null = null;
+      let closed = false;
       let lastValue: T | undefined;
-      let hasValue = false;
+      let timer: any = null;
 
-      for await (const value of nagare) {
-        lastValue = value;
-        hasValue = true;
-
-        if (timeout) clearTimeout(timeout);
-        
-        await new Promise<void>((resolve) => {
-          timeout = setTimeout(() => {
-            timeout = null;
-            resolve();
-          }, ms);
-        });
-
-        if (hasValue) {
-          yield lastValue!;
-          hasValue = false;
+      const outQueue: T[] = [];
+      let notify: (() => void) | null = null;
+      const notifyNext = () => {
+        if (notify) {
+          const n = notify; notify = null; n();
         }
-      }
+      };
 
-      if (hasValue && lastValue !== undefined) {
-        yield lastValue;
+      const pushOut = (v: T) => {
+        outQueue.push(v);
+        notifyNext();
+      };
+
+      const consumer = (async () => {
+        try {
+          for await (const v of src) {
+            lastValue = v;
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+              if (lastValue !== undefined) pushOut(lastValue);
+              lastValue = undefined;
+              timer = null;
+            }, ms);
+          }
+        } finally {
+          closed = true;
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+            if (lastValue !== undefined) pushOut(lastValue);
+            lastValue = undefined;
+          }
+          notifyNext();
+        }
+      })();
+      void consumer;
+
+      while (true) {
+        if (outQueue.length) {
+          yield outQueue.shift()!;
+          continue;
+        }
+        if (closed) break;
+        await new Promise<void>((res) => (notify = res));
       }
     };
     return new Nagare<T>(generator());
@@ -78,40 +101,59 @@ export function buffer<T>(size: number) {
 }
 
 export function bufferTime<T>(ms: number) {
-  return (nagare: Nagare<T>): Nagare<T[]> => {
+  return (src: Nagare<T>): Nagare<T[]> => {
     const generator = async function* (): AsyncGenerator<T[]> {
-      let buffer: T[] = [];
-      let timeout: NodeJS.Timeout | null = null;
+      let buf: T[] = [];
+      let interval: any = null;
+      let closed = false;
 
-      const flush = () => {
-        if (buffer.length > 0) {
-          const toYield = buffer.slice();
-          buffer.length = 0;
-          return toYield;
-        }
-        return null;
-      };
+      const outQueue: T[][] = [];
+      let notify: (() => void) | null = null;
+      const notifyNext = () => { if (notify) { const n = notify; notify = null; n(); } };
+      const pushOut = (arr: T[]) => { outQueue.push(arr); notifyNext(); };
 
-      for await (const value of nagare) {
-        buffer.push(value);
-
-        if (!timeout) {
-          timeout = setTimeout(() => {
-            timeout = null;
-            const values = flush();
-            if (values) {
+      const startIntervalIfNeeded = () => {
+        if (!interval) {
+          interval = setInterval(() => {
+            if (buf.length > 0) {
+              const out = buf.slice();
+              buf.length = 0;
+              pushOut(out);
             }
           }, ms);
         }
+      };
 
-        if (buffer.length >= 1000) {
-          const values = flush();
-          if (values) yield values;
+      const consumer = (async () => {
+        try {
+          for await (const v of src) {
+            buf.push(v);
+            startIntervalIfNeeded();
+          }
+        } finally {
+          closed = true;
+          if (interval) {
+            clearInterval(interval);
+            interval = null;
+          }
+          if (buf.length > 0) {
+            const out = buf.slice();
+            buf.length = 0;
+            pushOut(out);
+          }
+          notifyNext();
         }
-      }
+      })();
+      void consumer;
 
-      const remaining = flush();
-      if (remaining) yield remaining;
+      while (true) {
+        if (outQueue.length) {
+          yield outQueue.shift()!;
+          continue;
+        }
+        if (closed) break;
+        await new Promise<void>((res) => (notify = res));
+      }
     };
     return new Nagare<T[]>(generator());
   };

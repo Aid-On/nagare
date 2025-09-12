@@ -84,6 +84,40 @@ export const nagare = {
     };
     return new Nagare<T>(generator());
   },
+
+  combineLatest: <T extends unknown[]>(...nagares: { [K in keyof T]: Nagare<T[K]> }): Nagare<T> => {
+    const generator = async function* (): AsyncGenerator<T> {
+      const iterators = nagares.map(r => r[Symbol.asyncIterator]());
+      const current: any[] = new Array(nagares.length);
+      const hasValue: boolean[] = new Array(nagares.length).fill(false);
+      let active = new Map<number, Promise<{ i: number; r: IteratorResult<any> }>>();
+      let doneCount = 0;
+
+      const schedule = (i: number) => {
+        if (active.has(i)) return;
+        active.set(i, iterators[i].next().then(r => ({ i, r })));
+      };
+      for (let i = 0; i < iterators.length; i++) schedule(i);
+
+      while (doneCount < iterators.length) {
+        const { i, r } = await Promise.race(active.values());
+        active.delete(i);
+        if (r.done) {
+          doneCount++;
+          // do not schedule further reads for i
+        } else {
+          current[i] = r.value;
+          hasValue[i] = true;
+          // yield when all have produced at least once
+          if (hasValue.every(Boolean)) {
+            yield [...current] as T;
+          }
+          schedule(i);
+        }
+      }
+    };
+    return new Nagare<T>(generator());
+  },
 };
 
 export default nagare;
