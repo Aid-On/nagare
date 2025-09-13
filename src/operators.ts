@@ -220,13 +220,114 @@ export function startWith<T>(...values: T[]) {
 }
 
 export function concatMap<T, U>(
-  fn: (value: T) => Nagare<U> | Promise<Nagare<U>>
+  fn: (value: T) => Nagare<U> | U[] | Promise<Nagare<U> | U[]>
 ) {
   return (nagare: Nagare<T>): Nagare<U> => {
+    // Eager fast path: outer is array with no ops and fn is sync returning arrays
+    try {
+      const src = (nagare as any)['source'];
+      const ops = ((nagare as any)['operators'] as unknown[]) ?? [];
+      const isAsyncFn = (fn as any)?.constructor?.name === 'AsyncFunction';
+      if (Array.isArray(src) && ops.length === 0 && !isAsyncFn && src.length > 0) {
+        const first = fn(src[0] as T) as any;
+        if (Array.isArray(first)) {
+          const firstArr = first as U[];
+          const innerLen = firstArr.length;
+          const srcArr = src as T[];
+          // Try prealloc when inner length seems fixed
+          let out: U[];
+          let k = 0;
+          if (innerLen > 0) {
+            out = new Array<U>(srcArr.length * innerLen);
+            // copy first
+            for (let j = 0; j < innerLen; j++) out[k++] = firstArr[j];
+            for (let i = 1; i < srcArr.length; i++) {
+              const inner = fn(srcArr[i]) as any;
+              if (!Array.isArray(inner)) { throw new Error('fallback'); }
+              const arr = inner as U[];
+              if (arr.length !== innerLen) { throw new Error('varying'); }
+              for (let j = 0; j < innerLen; j++) out[k++] = arr[j];
+            }
+            return new Nagare<U>(out);
+          } else {
+            // empty inner always: return empty
+            return new Nagare<U>([]);
+          }
+        }
+      }
+    } catch {
+      // ignore and fallback to generator path
+    }
     const generator = async function* (): AsyncGenerator<U> {
+      const maybeSource = (nagare as any)['source'];
+      const maybeOps = ((nagare as any)['operators'] as unknown[]) ?? [];
+      if (Array.isArray(maybeSource) && maybeOps.length === 0) {
+        const arr = maybeSource as T[];
+        for (let i = 0; i < arr.length; i++) {
+          const inner = await fn(arr[i] as T);
+          if (Array.isArray(inner)) {
+            const innerArr = inner as U[];
+            for (let j = 0; j < innerArr.length; j++) yield innerArr[j];
+          } else {
+            const innerNagare = inner as Nagare<U>;
+            for await (const v of innerNagare) yield v;
+          }
+        }
+        return;
+      }
+
       for await (const value of nagare) {
-        const innerNagare = await fn(value);
-        yield* innerNagare;
+        const inner = await fn(value);
+        if (Array.isArray(inner)) {
+          // Fast path: plain array
+          for (let i = 0; i < (inner as U[]).length; i++) {
+            yield (inner as U[])[i];
+          }
+        } else {
+          const innerNagare = inner as Nagare<U>;
+          yield* innerNagare;
+        }
+      }
+    };
+    return new Nagare<U>(generator());
+  };
+}
+
+export function concatMapArray<T, U>(
+  fn: (value: T) => U[]
+) {
+  return (nag: Nagare<T>): Nagare<U> => {
+    // Eager path for array sources
+    try {
+      const src = (nag as any)['source'];
+      const ops = ((nag as any)['operators'] as unknown[]) ?? [];
+      if (Array.isArray(src) && ops.length === 0) {
+        const srcArr = src as T[];
+        if (srcArr.length === 0) return new Nagare<U>([]);
+        const first = fn(srcArr[0]);
+        const innerLen = first.length;
+        if (innerLen === 0) return new Nagare<U>([]);
+        const out = new Array<U>(srcArr.length * innerLen);
+        let k = 0;
+        for (let j = 0; j < innerLen; j++) out[k++] = first[j];
+        for (let i = 1; i < srcArr.length; i++) {
+          const inner = fn(srcArr[i]);
+          if (inner.length !== innerLen) {
+            // fallback to generic if varying lengths
+            throw new Error('varying');
+          }
+          for (let j = 0; j < innerLen; j++) out[k++] = inner[j];
+        }
+        return new Nagare<U>(out);
+      }
+    } catch {
+      // ignore
+    }
+
+    const generator = async function* (): AsyncGenerator<U> {
+      for await (const v of nag) {
+        const inner = fn(v);
+        for (let j = 0; j < inner.length; j++) yield inner[j];
       }
     };
     return new Nagare<U>(generator());

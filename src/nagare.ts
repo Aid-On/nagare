@@ -218,15 +218,14 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     };
   }
 
-  // kept for potential future heuristics; currently unused with array kernel handling stateful ops
-  // private hasStatefulOps(ops: Array<unknown>): boolean {
-  //   for (const op of ops) {
-  //     const meta = (op as Record<PropertyKey, unknown>)?.__nagareOp as { kind?: string } | undefined;
-  //     if (!meta) continue;
-  //     if (meta.kind === 'scan' || meta.kind === 'take' || meta.kind === 'skip') return true;
-  //   }
-  //   return false;
-  // }
+  private hasStatefulOps(ops: Array<unknown>): boolean {
+    for (const op of ops) {
+      const meta = (op as any)?.[OP_META] || (op as any)?.__nagareOp;
+      if (!meta) continue;
+      if (meta.kind === 'scan' || meta.kind === 'take' || meta.kind === 'skip') return true;
+    }
+    return false;
+  }
 
   // reserved for future granular checks
   // private hasOpKind(ops: Array<any>, kind: 'scan' | 'take' | 'skip' | 'filter' | 'map'): boolean {
@@ -551,16 +550,19 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
         );
         if (fused) {
           const data = baseSource as { length: number; [index: number]: T };
-          // If no error handling, run one checked iteration then unchecked fast path
+          const stateful = this.hasStatefulOps(fusedOps);
+          // If no error handling, prefer unchecked fast path; for stateful ops avoid single-item probe
           if (!errorHandler && !terminateOnError) {
             const fast = _compileOperatorChainUnchecked(
               fusedOps,
               { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
             );
-            if (data.length > 0) {
+            let startIndex = 0;
+            if (!stateful && data.length > 0) {
               try {
                 const first = fused(data[0]);
                 if (first !== undefined) yield first as T;
+                startIndex = 1;
               } catch (err) {
                 if (err === Nagare.ASYNC_DETECTED) {
                   const rest = new Nagare<T, E>(data as unknown as T[]);
@@ -587,14 +589,14 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
               );
             }
             if (kernel) {
-              const outArr: T[] = new Array<T>(data.length - 1);
+              const outArr: T[] = new Array<T>(Math.max(0, data.length - startIndex));
               let k = 0;
-              k = kernel(data as T[], 1, outArr as T[], k) as number;
+              k = kernel(data as T[], startIndex, outArr as T[], k) as number;
               for (let j = 0; j < k; j++) {
                 yield outArr[j] as T;
               }
             } else {
-              for (let i = 1; i < data.length; i++) {
+              for (let i = startIndex; i < data.length; i++) {
                 const out = fast(data[i]);
                 if (out !== undefined) yield out as T;
               }
@@ -727,7 +729,8 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
             { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
           );
           let startIndex = 0;
-          if (src.length > 0) {
+          const stateful = this.hasStatefulOps(fusedOps);
+          if (!stateful && src.length > 0) {
             try {
               const out0 = fused(src[0]);
               if (out0 !== undefined) result[k++] = out0 as T;
@@ -813,6 +816,11 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
       }
     }
 
+    // No operators and array-like source: return a copy fast
+    if ((Array.isArray(baseSource) || isTypedArrayLike(baseSource)) && fusedOps.length === 0) {
+      return Array.prototype.slice.call(baseSource as any) as T[];
+    }
+
     // Standard async iteration
     const result: T[] = [];
     for await (const value of this) {
@@ -867,44 +875,37 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
     reducer: (acc: U, value: T) => U | Promise<U>,
     initial: U
   ): Promise<U> {
-    // Try fused array fast path when possible and reducer is sync
-    const { baseSource, operators: fusedOps, errorHandler, terminateOnError } = this.flattenChain();
+    // Try array fast paths when possible and reducer is sync
+    const { baseSource, operators: fusedOps } = this.flattenChain();
     const reducerIsAsync = reducer.constructor.name === 'AsyncFunction';
-    if (Nagare._fusionEnabled && !reducerIsAsync && (Array.isArray(baseSource) || isTypedArrayLike(baseSource))) {
+    if (!reducerIsAsync && (Array.isArray(baseSource) || isTypedArrayLike(baseSource))) {
+      const src = baseSource as { length: number; [index: number]: T };
+      // No operators or fusion disabled: tight loop
+      if (!Nagare._fusionEnabled || fusedOps.length === 0) {
+        let acc = initial as U;
+        for (let i = 0; i < src.length; i++) {
+          acc = reducer(acc, src[i] as T) as U;
+        }
+        return acc;
+      }
+      // Otherwise: fuse operators then reduce
       try {
         const fast = _compileOperatorChainUnchecked(
           fusedOps,
           { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
         );
-        const src = baseSource as { length: number; [index: number]: T };
-        let acc = initial;
+        let acc = initial as U;
         for (let i = 0; i < src.length; i++) {
-          // Apply fused chain; skip undefined (filtered out)
-          try {
-            const v = fast(src[i]);
-            if (v !== undefined) {
-              acc = reducer(acc, v as T) as U;
-            }
-          } catch (err) {
-            if (err === Nagare.ASYNC_DETECTED) throw err;
-            if (errorHandler) {
-              const recovered = errorHandler(err as unknown) as T | undefined;
-              if (recovered !== undefined) {
-                acc = reducer(acc, recovered) as U;
-              } else if (terminateOnError) {
-                throw err;
-              }
-            } else if (terminateOnError) {
-              throw err;
-            }
-          }
+          const v = fast(src[i]);
+          if (v !== undefined) acc = reducer(acc, v as T) as U;
         }
-        return acc as U;
+        return acc;
       } catch {
-        // fallback to generic path
+        // fallthrough
       }
     }
 
+    // Generic async iteration path
     let acc = initial;
     for await (const value of this) {
       acc = await reducer(acc, value);

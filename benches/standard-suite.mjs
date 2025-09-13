@@ -1,6 +1,6 @@
 import { performance } from 'perf_hooks';
 import { from, lastValueFrom, map as rxMap, filter as rxFilter, toArray as rxToArray, concatMap as rxConcatMap, reduce as rxReduce } from 'rxjs';
-import nagare, { Nagare, concatMap as nagConcatMap } from '../dist/index.mjs';
+import nagare, { Nagare, concatMap as nagConcatMap, concatMapArray as nagConcatMapArray } from '../dist/index.mjs';
 
 function fmtMs(ms) { return `${ms.toFixed(2)}ms`; }
 function fmtOps(ops) {
@@ -62,12 +62,12 @@ async function benchConcatMap(N, inner=5){
   async function runRx(){ const out = await lastValueFrom(from(data).pipe(rxConcatMap((x)=>from(Array.from({length:inner}, (_,j)=>x+j))), rxToArray())); if (out.length!==expectedCount) throw new Error('rxjs mismatch'); }
   async function runNagNoFusion(){
     Nagare.setJitMode('fast'); Nagare.setFusionEnabled(false);
-    const out = await nagConcatMap(async (x)=> nagare.of(...Array.from({length:inner},(_,j)=>x+j)))(nagare.from(data)).toArray();
+    const out = await nagConcatMapArray((x)=> Array.from({length:inner},(_,j)=>x+j))(nagare.from(data)).toArray();
     if (out.length!==expectedCount) throw new Error('nagare(fast,nofusion) mismatch');
   }
   async function runNagFusion(){
     Nagare.setJitMode('fast'); Nagare.setFusionEnabled(true);
-    const out = await nagConcatMap(async (x)=> nagare.of(...Array.from({length:inner},(_,j)=>x+j)))(nagare.from(data)).toArray();
+    const out = await nagConcatMapArray((x)=> Array.from({length:inner},(_,j)=>x+j))(nagare.from(data)).toArray();
     if (out.length!==expectedCount) throw new Error('nagare(fast,fusion) mismatch');
   }
   const rNative = await measure('Native', runNative, {runs:5}); const rRx = await measure('RxJS', runRx, {runs:5}); const rNoF = await measure('Nagare(fast,nofusion)', runNagNoFusion, {runs:5}); const rF = await measure('Nagare(fast,fusion)', runNagFusion, {runs:5});
