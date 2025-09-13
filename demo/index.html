@@ -1170,8 +1170,7 @@ liveStream.observe(
   <!-- Scripts -->
   <script type="module" src="./nagare.mjs"></script>
   <script type="module">
-    import { Nagare, concatMapArray } from '@aid-on/nagare';
-    import { processFloat32Batch, processFloat64Batch } from '@aid-on/nagare';
+    import { Nagare, concatMapArray, processFloat32Batch, processFloat64Batch } from '@aid-on/nagare';
     // Nagare is imported from '@aid-on/nagare' via Vite alias at top of this module script
     console.log('Nagare loaded successfully');
 
@@ -1508,11 +1507,12 @@ liveStream.observe(
     });
 
     // Accordion for code examples
-    document.querySelectorAll('.code-example .code-header').forEach((hdr) => {
+    document.querySelectorAll('.code-example').forEach((ex) => {
+      const hdr = ex.querySelector('.code-header');
+      const content = ex.querySelector('.code-content');
+      if (!hdr || !content) return;
       hdr.addEventListener('click', () => {
-        const parent = hdr.closest('.code-example');
-        if (!parent) return;
-        parent.classList.toggle('open');
+        ex.classList.toggle('open');
       });
       const chev = document.createElement('span');
       chev.textContent = '›';
