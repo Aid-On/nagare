@@ -1486,24 +1486,54 @@ liveStream.observe(
       }
     });
 
-    // Other demo handlers
+    // Other demo handlers (reset to deterministic, always-working behavior)
+    let mergeTimers = [];
     document.getElementById('runMerge').addEventListener('click', () => {
-      document.getElementById('streamA').textContent = '[1, 3, 5]';
-      document.getElementById('streamB').textContent = '[2, 4, 6]';
-      document.getElementById('streamC').textContent = '[7, 8, 9]';
-      document.getElementById('mergedResult').textContent = '[1, 2, 3, 4, 5, 6, 7, 8, 9]';
+      mergeTimers.forEach(t => clearInterval(t));
+      mergeTimers = [];
+      const aOut = [], bOut = [], cOut = [], merged = [];
+      const update = () => {
+        document.getElementById('streamA').textContent = `[${aOut.slice(-8).join(', ')}]`;
+        document.getElementById('streamB').textContent = `[${bOut.slice(-8).join(', ')}]`;
+        document.getElementById('streamC').textContent = `[${cOut.slice(-8).join(', ')}]`;
+        document.getElementById('mergedResult').textContent = `[${merged.slice(-12).join(', ')}]`;
+      };
+      let i=0,j=0,k=0;
+      mergeTimers.push(setInterval(() => { aOut.push(1+2*i); merged.push(`A:${1+2*i}`); i++; update(); }, 120));
+      mergeTimers.push(setInterval(() => { bOut.push(2+2*j); merged.push(`B:${2+2*j}`); j++; update(); }, 180));
+      mergeTimers.push(setInterval(() => { cOut.push(7+k);   merged.push(`C:${7+k}`);   k++; update(); }, 250));
+      setTimeout(() => { mergeTimers.forEach(t => clearInterval(t)); mergeTimers=[]; }, 6000);
     });
 
     document.getElementById('runError').addEventListener('click', () => {
-      // Demo is static for now
+      const input = [1, 'bad', 3, null, 5];
+      const safe = input.map(v => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0; // rescue
+      }).filter(x => x >= 0);
+      document.getElementById('errorResult').textContent = `[${safe.join(', ')}]`;
+      const recovered = input.length - safe.filter(x=>x!==0).length;
+      document.getElementById('errorStatus').textContent = `✅ ${recovered}/5 items recovered`;
     });
 
     document.getElementById('runWindow').addEventListener('click', () => {
-      // Demo is static for now
+      const data = [1,2,3,4,5,6,7,8,9];
+      const W = 3;
+      const out = [];
+      for (let i = 0; i <= data.length - W; i++) {
+        let s = 0; for (let k = 0; k < W; k++) s += data[i+k];
+        out.push(Math.round(s/W));
+      }
+      document.getElementById('windowResult').textContent = `[${out.join(', ')}]`;
     });
 
     document.getElementById('runOperators').addEventListener('click', () => {
-      document.getElementById('operatorResult').textContent = '[3, 6, 10, 15, 21]';
+      const src = [1,2,3,4,5,6,7];
+      const skipped = src.slice(2);
+      const taken = skipped.slice(0,5);
+      const scanned = [];
+      let acc = 0; for (let v of taken) { acc += v; scanned.push(acc); }
+      document.getElementById('operatorResult').textContent = `[${scanned.join(', ')}]`;
     });
 
     // Accordion for code examples
