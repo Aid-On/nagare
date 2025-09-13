@@ -415,12 +415,13 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
       if (!wasmModule) throw new Error('WASM module not loaded');
       
       if (value instanceof Float32Array) {
-        const result = wasmModule.process_float32_batch(value, kernelName);
+        if (typeof (wasmModule as any).process_float32_batch !== 'function') return value;
+        const result = (wasmModule as any).process_float32_batch(value, kernelName);
         return result as unknown;
       }
       if (typeof (globalThis as any).Float64Array !== 'undefined' && value instanceof (globalThis as any).Float64Array) {
-        if (!wasmModule.process_float64_batch) return value;
-        const result = wasmModule.process_float64_batch(value, kernelName);
+        if (!(wasmModule as any).process_float64_batch) return value;
+        const result = (wasmModule as any).process_float64_batch(value, kernelName);
         return result as unknown;
       }
       

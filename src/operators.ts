@@ -399,10 +399,22 @@ export async function processFloat32Batch(
   operation: string
 ): Promise<Float32Array> {
   await ensureWasmLoaded();
-  if (!wasmModule) {
-    throw new Error('WASM module not loaded');
+  if (!wasmModule || typeof (wasmModule as any).process_float32_batch !== 'function') {
+    // Fallback: CPU loop
+    const out = new Float32Array(data.length);
+    switch (operation) {
+      case 'square':
+        for (let i = 0; i < data.length; i++) out[i] = data[i] * data[i];
+        break;
+      case 'sqrt':
+        for (let i = 0; i < data.length; i++) out[i] = Math.sqrt(data[i]);
+        break;
+      default:
+        for (let i = 0; i < data.length; i++) out[i] = data[i];
+    }
+    return out;
   }
-  return wasmModule.process_float32_batch(data, operation);
+  return (wasmModule as any).process_float32_batch(data, operation);
 }
 
 export async function processFloat64Batch(
@@ -413,10 +425,22 @@ export async function processFloat64Batch(
   if (!wasmModule) {
     throw new Error('WASM module not loaded');
   }
-  if (!wasmModule.process_float64_batch) {
-    throw new Error('process_float64_batch not available');
+  if (!(wasmModule as any).process_float64_batch) {
+    // Fallback: CPU loop
+    const out = new Float64Array(data.length);
+    switch (operation) {
+      case 'square':
+        for (let i = 0; i < data.length; i++) out[i] = data[i] * data[i];
+        break;
+      case 'sqrt':
+        for (let i = 0; i < data.length; i++) out[i] = Math.sqrt(data[i]);
+        break;
+      default:
+        for (let i = 0; i < data.length; i++) out[i] = data[i];
+    }
+    return out;
   }
-  return wasmModule.process_float64_batch(data, operation);
+  return (wasmModule as any).process_float64_batch(data, operation);
 }
 
 export async function simdMapMulAdd(
