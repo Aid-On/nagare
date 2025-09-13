@@ -430,6 +430,10 @@
       font-size: 0.875rem;
       font-weight: 500;
       color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .code-content {
@@ -438,7 +442,9 @@
       font-size: 0.875rem;
       line-height: 1.6;
       overflow-x: auto;
+      display: none;
     }
+    .code-example.open .code-content { display: block; }
 
     /* API Reference */
     .api-grid {
@@ -563,7 +569,7 @@
       color: var(--primary);
     }
   </style>
-  <script type="module" crossorigin src="./assets/main-B5Qt9EMX.js"></script>
+  <script type="module" crossorigin src="./assets/main-Ct9Zixe5.js"></script>
 </head>
 <body>
   <!-- Header -->
@@ -688,6 +694,25 @@
 
       <div class="features-grid">
         <div class="feature-card">
+          <div class="feature-icon">🧮</div>
+          <h3 class="feature-title">Aggregates (sum / min / max / mean / find)</h3>
+          <p class="feature-description">
+            Try Nagare's JIT-optimized aggregates on your own input.
+          </p>
+          <div class="feature-demo">
+            <label>Numbers (comma separated):</label>
+            <input id="aggInput" class="input" value="3,1,4,1,5,9,2,6,5" style="width:100%; margin: 0.5rem 0;" />
+            <label>Find predicate (JS expr):</label>
+            <input id="aggPredicate" class="input" value="x % 2 === 0" style="width:100%; margin: 0.5rem 0;" />
+            <div class="demo-controls">
+              <button class="btn btn-sm" id="runAggregates">▶ Run</button>
+            </div>
+            <div style="margin-top:0.5rem">
+              Sum: <span id="aggSum">-</span> · Min: <span id="aggMin">-</span> · Max: <span id="aggMax">-</span> · Mean: <span id="aggMean">-</span> · Find: <span id="aggFind">-</span>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
           <div class="feature-icon">🔄</div>
           <h3 class="feature-title">Stream Transformation</h3>
           <p class="feature-description">
@@ -799,6 +824,41 @@
           </div>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runOperators">▶ Run Demo</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🧱</div>
+          <h3 class="feature-title">concatMapArray (fast path)</h3>
+          <p class="feature-description">
+            Expand each item to a small, fixed-size array efficiently.
+          </p>
+          <div class="feature-demo">
+            <label>Outer (comma separated):</label>
+            <input id="cmaOuter" class="input" value="1,2,3,4" style="width:100%; margin: 0.5rem 0;" />
+            <label>Inner length:</label>
+            <input id="cmaInner" class="input" type="number" min="0" value="2" style="width:100%; margin: 0.5rem 0;" />
+            <div class="demo-controls">
+              <button class="btn btn-sm" id="runCMA">▶ Run</button>
+            </div>
+            <div>Output: <span id="cmaOut">-</span></div>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🧬</div>
+          <h3 class="feature-title">SIMD / WASM (Float32/64)</h3>
+          <p class="feature-description">
+            Process typed arrays using WASM kernels (square operation).
+          </p>
+          <div class="feature-demo">
+            <label>Length:</label>
+            <input id="simdLen" class="input" type="number" min="1" value="100000" style="width:100%; margin: 0.5rem 0;" />
+            <div class="demo-controls">
+              <button class="btn btn-sm" id="runSIMD32">▶ Float32 square</button>
+              <button class="btn btn-sm" id="runSIMD64">▶ Float64 square</button>
+            </div>
+            <div>Time: <span id="simdTime">-</span> · Sample: <span id="simdSample">-</span></div>
           </div>
         </div>
       </div>
@@ -1109,249 +1169,5 @@ liveStream.observe(
   </main>
 
   <!-- Scripts -->
-  <script>
-    // Import Nagare and setup
-    let Nagare;
-    import('./assets/nagare-CnWdEWk1.mjs').then(module => {
-      Nagare = module.Nagare;
-      console.log('Nagare loaded successfully');
-    });
-
-    // Tab Navigation
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const sectionName = tab.dataset.section;
-        
-        // Update tabs
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        
-        // Update sections
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.getElementById(sectionName).classList.add('active');
-      });
-    });
-
-    // Benchmark functionality
-    document.getElementById('runBenchmark').addEventListener('click', runBenchmark);
-
-    async function runBenchmark() {
-      const btn = document.getElementById('runBenchmark');
-      const testType = document.getElementById('testType').value;
-      const dataSize = parseInt(document.getElementById('dataSize').value);
-      const status = document.getElementById('benchmarkStatus');
-      const resultsTable = document.getElementById('resultsTable');
-      const summary = document.getElementById('performanceSummary');
-
-      btn.disabled = true;
-      btn.innerHTML = '<span class="loading"></span> Running...';
-      status.innerHTML = '<div class="status info">🏃‍♂️ Running benchmark...</div>';
-
-      try {
-        const data = Array.from({ length: dataSize }, (_, i) => i);
-        let nativeResult, rxjsResult, nagareResult;
-        let nativeTime, rxjsTime, nagareTime;
-
-        // Native JS
-        const nativeStart = performance.now();
-        if (testType === 'mapFilter') {
-          nativeResult = data.map(x => x * 2).filter(x => x % 3 === 0);
-        } else if (testType === 'complex') {
-          let acc = 0;
-          nativeResult = data
-            .map(x => Math.sqrt(x))
-            .filter(x => x > 10)
-            .map(x => Math.floor(x * 100))
-            .map(x => acc += x)
-            .filter(x => x % 2 === 0);
-        } else if (testType === 'large') {
-          nativeResult = data.map(x => x * 3).filter(x => x % 5 === 0);
-        } else {
-          const objects = data.map(i => ({ id: i, value: Math.random() * 1000, active: i % 2 === 0 }));
-          nativeResult = objects
-            .filter(obj => obj.active)
-            .map(obj => ({ ...obj, value: obj.value * 1.1 }))
-            .filter(obj => obj.value > 100)
-            .map(obj => obj.value);
-          data.splice(0); // Use objects for other tests too
-          data.push(...objects);
-        }
-        nativeTime = performance.now() - nativeStart;
-
-        // RxJS
-        const rxjsStart = performance.now();
-        if (testType === 'mapFilter') {
-          rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(data).pipe(
-              rxjs.operators.map(x => x * 2),
-              rxjs.operators.filter(x => x % 3 === 0),
-              rxjs.operators.toArray()
-            )
-          );
-        } else if (testType === 'complex') {
-          rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(data).pipe(
-              rxjs.operators.map(x => Math.sqrt(x)),
-              rxjs.operators.filter(x => x > 10),
-              rxjs.operators.map(x => Math.floor(x * 100)),
-              rxjs.operators.scan((acc, x) => acc + x, 0),
-              rxjs.operators.filter(x => x % 2 === 0),
-              rxjs.operators.toArray()
-            )
-          );
-        } else if (testType === 'large') {
-          rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(data).pipe(
-              rxjs.operators.map(x => x * 3),
-              rxjs.operators.filter(x => x % 5 === 0),
-              rxjs.operators.toArray()
-            )
-          );
-        } else {
-          rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(data).pipe(
-              rxjs.operators.filter(obj => obj.active),
-              rxjs.operators.map(obj => ({ ...obj, value: obj.value * 1.1 })),
-              rxjs.operators.filter(obj => obj.value > 100),
-              rxjs.operators.map(obj => obj.value),
-              rxjs.operators.toArray()
-            )
-          );
-        }
-        rxjsTime = performance.now() - rxjsStart;
-
-        // Nagare
-        const nagareStart = performance.now();
-        if (testType === 'mapFilter') {
-          nagareResult = await Nagare.from(data)
-            .map(x => x * 2)
-            .filter(x => x % 3 === 0)
-            .toArray();
-        } else if (testType === 'complex') {
-          nagareResult = await Nagare.from(data)
-            .map(x => Math.sqrt(x))
-            .filter(x => x > 10)
-            .map(x => Math.floor(x * 100))
-            .scan((acc, x) => acc + x, 0)
-            .filter(x => x % 2 === 0)
-            .toArray();
-        } else if (testType === 'large') {
-          nagareResult = await Nagare.from(data)
-            .map(x => x * 3)
-            .filter(x => x % 5 === 0)
-            .toArray();
-        } else {
-          nagareResult = await Nagare.from(data)
-            .filter(obj => obj.active)
-            .map(obj => ({ ...obj, value: obj.value * 1.1 }))
-            .filter(obj => obj.value > 100)
-            .map(obj => obj.value)
-            .toArray();
-        }
-        nagareTime = performance.now() - nagareStart;
-
-        // Calculate results
-        const results = [
-          { name: 'nagare', time: nagareTime, label: '🚀 Nagare' },
-          { name: 'native', time: nativeTime, label: '🟦 Native JS' },
-          { name: 'rxjs', time: rxjsTime, label: '🟨 RxJS' }
-        ].sort((a, b) => a.time - b.time);
-
-        const medals = ['gold', 'silver', 'bronze'];
-        
-        // Update table
-        results.forEach((result, index) => {
-          document.getElementById(result.name + 'Time').textContent = result.time.toFixed(2) + 'ms';
-          document.getElementById(result.name + 'Throughput').textContent = 
-            (dataSize / result.time / 1000).toFixed(0) + 'M ops/s';
-          
-          const medal = document.getElementById(result.name + 'Medal');
-          medal.textContent = index === 0 ? '🥇 Champion' : index === 1 ? '🥈 Runner-up' : '🥉 Third';
-          medal.className = 'medal ' + medals[index];
-        });
-
-        // Show results
-        resultsTable.style.display = 'table';
-        summary.style.display = 'block';
-
-        // Summary message
-        const winner = results[0];
-        const speedupVsSecond = (results[1].time / winner.time).toFixed(1);
-        const speedupVsThird = (results[2].time / winner.time).toFixed(1);
-        
-        if (winner.name === 'nagare') {
-          document.getElementById('summaryText').innerHTML = 
-            `🎉 <strong>Nagare wins!</strong> ${speedupVsSecond}x faster than ${results[1].label} and ${speedupVsThird}x faster than ${results[2].label}`;
-        } else {
-          document.getElementById('summaryText').innerHTML = 
-            `🏆 <strong>${winner.label} wins!</strong> Beat Nagare by ${(nagareTime / winner.time).toFixed(1)}x`;
-        }
-
-        status.innerHTML = '<div class="status success">✅ Benchmark completed successfully</div>';
-
-      } catch (error) {
-        status.innerHTML = '<div class="status error">❌ Benchmark failed: ' + error.message + '</div>';
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '🚀 Run Benchmark';
-      }
-    }
-
-    // Feature demos
-    document.getElementById('runTransform').addEventListener('click', () => {
-      const input = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-      const result = input.map(x => x * 2).filter(x => x % 3 === 0);
-      document.getElementById('transformResult').textContent = JSON.stringify(result);
-    });
-
-    // Real-time stream demo
-    let realtimeSubscription = null;
-    document.getElementById('startRealtime').addEventListener('click', () => {
-      if (realtimeSubscription) return;
-      
-      let count = 0;
-      const startTime = Date.now();
-      
-      document.getElementById('streamStatus').textContent = 'Active';
-      
-      realtimeSubscription = setInterval(() => {
-        count++;
-        const value = Math.floor(Math.random() * 1000);
-        const rate = Math.floor(count / (Date.now() - startTime) * 1000);
-        
-        document.getElementById('itemCount').textContent = count;
-        document.getElementById('currentValue').textContent = value;
-        document.getElementById('processRate').textContent = rate;
-      }, 100);
-    });
-
-    document.getElementById('stopRealtime').addEventListener('click', () => {
-      if (realtimeSubscription) {
-        clearInterval(realtimeSubscription);
-        realtimeSubscription = null;
-        document.getElementById('streamStatus').textContent = 'Stopped';
-      }
-    });
-
-    // Other demo handlers
-    document.getElementById('runMerge').addEventListener('click', () => {
-      document.getElementById('streamA').textContent = '[1, 3, 5]';
-      document.getElementById('streamB').textContent = '[2, 4, 6]';
-      document.getElementById('streamC').textContent = '[7, 8, 9]';
-      document.getElementById('mergedResult').textContent = '[1, 2, 3, 4, 5, 6, 7, 8, 9]';
-    });
-
-    document.getElementById('runError').addEventListener('click', () => {
-      // Demo is static for now
-    });
-
-    document.getElementById('runWindow').addEventListener('click', () => {
-      // Demo is static for now
-    });
-
-    document.getElementById('runOperators').addEventListener('click', () => {
-      document.getElementById('operatorResult').textContent = '[3, 6, 10, 15, 21]';
-    });
-  </script>
 </body>
 </html>

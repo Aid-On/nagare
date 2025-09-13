@@ -430,6 +430,10 @@
       font-size: 0.875rem;
       font-weight: 500;
       color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .code-content {
@@ -438,7 +442,9 @@
       font-size: 0.875rem;
       line-height: 1.6;
       overflow-x: auto;
+      display: none;
     }
+    .code-example.open .code-content { display: block; }
 
     /* API Reference */
     .api-grid {
@@ -687,6 +693,25 @@
 
       <div class="features-grid">
         <div class="feature-card">
+          <div class="feature-icon">🧮</div>
+          <h3 class="feature-title">Aggregates (sum / min / max / mean / find)</h3>
+          <p class="feature-description">
+            Try Nagare's JIT-optimized aggregates on your own input.
+          </p>
+          <div class="feature-demo">
+            <label>Numbers (comma separated):</label>
+            <input id="aggInput" class="input" value="3,1,4,1,5,9,2,6,5" style="width:100%; margin: 0.5rem 0;" />
+            <label>Find predicate (JS expr):</label>
+            <input id="aggPredicate" class="input" value="x % 2 === 0" style="width:100%; margin: 0.5rem 0;" />
+            <div class="demo-controls">
+              <button class="btn btn-sm" id="runAggregates">▶ Run</button>
+            </div>
+            <div style="margin-top:0.5rem">
+              Sum: <span id="aggSum">-</span> · Min: <span id="aggMin">-</span> · Max: <span id="aggMax">-</span> · Mean: <span id="aggMean">-</span> · Find: <span id="aggFind">-</span>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
           <div class="feature-icon">🔄</div>
           <h3 class="feature-title">Stream Transformation</h3>
           <p class="feature-description">
@@ -798,6 +823,41 @@
           </div>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runOperators">▶ Run Demo</button>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🧱</div>
+          <h3 class="feature-title">concatMapArray (fast path)</h3>
+          <p class="feature-description">
+            Expand each item to a small, fixed-size array efficiently.
+          </p>
+          <div class="feature-demo">
+            <label>Outer (comma separated):</label>
+            <input id="cmaOuter" class="input" value="1,2,3,4" style="width:100%; margin: 0.5rem 0;" />
+            <label>Inner length:</label>
+            <input id="cmaInner" class="input" type="number" min="0" value="2" style="width:100%; margin: 0.5rem 0;" />
+            <div class="demo-controls">
+              <button class="btn btn-sm" id="runCMA">▶ Run</button>
+            </div>
+            <div>Output: <span id="cmaOut">-</span></div>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🧬</div>
+          <h3 class="feature-title">SIMD / WASM (Float32/64)</h3>
+          <p class="feature-description">
+            Process typed arrays using WASM kernels (square operation).
+          </p>
+          <div class="feature-demo">
+            <label>Length:</label>
+            <input id="simdLen" class="input" type="number" min="1" value="100000" style="width:100%; margin: 0.5rem 0;" />
+            <div class="demo-controls">
+              <button class="btn btn-sm" id="runSIMD32">▶ Float32 square</button>
+              <button class="btn btn-sm" id="runSIMD64">▶ Float64 square</button>
+            </div>
+            <div>Time: <span id="simdTime">-</span> · Sample: <span id="simdSample">-</span></div>
           </div>
         </div>
       </div>
@@ -1109,13 +1169,11 @@ liveStream.observe(
 
   <!-- Scripts -->
   <script type="module" src="./nagare.mjs"></script>
-  <script>
-    // Import Nagare and setup
-    let Nagare;
-    import('./nagare.mjs').then(module => {
-      Nagare = module.Nagare;
-      console.log('Nagare loaded successfully');
-    });
+  <script type="module">
+    import { Nagare, concatMapArray } from '@aid-on/nagare';
+    import { processFloat32Batch, processFloat64Batch } from '@aid-on/nagare';
+    // Nagare is imported from '@aid-on/nagare' via Vite alias at top of this module script
+    console.log('Nagare loaded successfully');
 
     // Tab Navigation
     document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -1332,6 +1390,74 @@ liveStream.observe(
       document.getElementById('transformResult').textContent = JSON.stringify(result);
     });
 
+    // Aggregates demo
+    const runAggregatesBtn = document.getElementById('runAggregates');
+    if (runAggregatesBtn) {
+      runAggregatesBtn.addEventListener('click', async () => {
+        const raw = (document.getElementById('aggInput')).value;
+        const predSrc = (document.getElementById('aggPredicate')).value;
+        const nums = raw.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+        const stream = Nagare.from(nums);
+        const [sum, min, max, mean] = await Promise.all([
+          stream.sum(), stream.min(), stream.max(), stream.mean()
+        ]);
+        let findVal = undefined;
+        try {
+          const pred = new Function('x', `return (${predSrc});`);
+          findVal = await stream.find(pred);
+        } catch (_) { findVal = 'Invalid predicate'; }
+        document.getElementById('aggSum').textContent = String(sum ?? '-');
+        document.getElementById('aggMin').textContent = String(min ?? '-');
+        document.getElementById('aggMax').textContent = String(max ?? '-');
+        document.getElementById('aggMean').textContent = mean === undefined ? '-' : mean.toFixed(3);
+        document.getElementById('aggFind').textContent = String(findVal ?? '-');
+      });
+    }
+
+    // concatMapArray demo
+    const runCMA = document.getElementById('runCMA');
+    if (runCMA) {
+      runCMA.addEventListener('click', async () => {
+        const outerRaw = (document.getElementById('cmaOuter')).value;
+        const innerLen = parseInt((document.getElementById('cmaInner')).value) || 0;
+        const outer = outerRaw.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+        const out = await concatMapArray((x) => Array.from({length: innerLen}, (_, j) => x + j))(Nagare.from(outer)).toArray();
+        document.getElementById('cmaOut').textContent = JSON.stringify(out);
+      });
+    }
+
+    // SIMD / WASM demo
+    const runSIMD32 = document.getElementById('runSIMD32');
+    if (runSIMD32) {
+      runSIMD32.addEventListener('click', async () => {
+        const n = parseInt((document.getElementById('simdLen')).value) || 100000;
+        const arr = new Float32Array(n);
+        for (let i = 0; i < n; i++) arr[i] = (i % 100) / 10;
+        const t0 = performance.now();
+        const out = await processFloat32Batch(arr, 'square');
+        const t1 = performance.now();
+        document.getElementById('simdTime').textContent = (t1 - t0).toFixed(2) + 'ms';
+        document.getElementById('simdSample').textContent = `[${out[0].toFixed(2)}, ${out[1].toFixed(2)}, ...]`;
+      });
+    }
+    const runSIMD64 = document.getElementById('runSIMD64');
+    if (runSIMD64) {
+      runSIMD64.addEventListener('click', async () => {
+        const n = parseInt((document.getElementById('simdLen')).value) || 100000;
+        const arr = new Float64Array(n);
+        for (let i = 0; i < n; i++) arr[i] = (i % 100) / 10;
+        const t0 = performance.now();
+        try {
+          const out = await processFloat64Batch(arr, 'square');
+          const t1 = performance.now();
+          document.getElementById('simdTime').textContent = (t1 - t0).toFixed(2) + 'ms';
+          document.getElementById('simdSample').textContent = `[${out[0].toFixed(2)}, ${out[1].toFixed(2)}, ...]`;
+        } catch (e) {
+          document.getElementById('simdTime').textContent = 'WASM not available';
+        }
+      });
+    }
+
     // Real-time stream demo
     let realtimeSubscription = null;
     document.getElementById('startRealtime').addEventListener('click', () => {
@@ -1379,6 +1505,19 @@ liveStream.observe(
 
     document.getElementById('runOperators').addEventListener('click', () => {
       document.getElementById('operatorResult').textContent = '[3, 6, 10, 15, 21]';
+    });
+
+    // Accordion for code examples
+    document.querySelectorAll('.code-example .code-header').forEach((hdr) => {
+      hdr.addEventListener('click', () => {
+        const parent = hdr.closest('.code-example');
+        if (!parent) return;
+        parent.classList.toggle('open');
+      });
+      const chev = document.createElement('span');
+      chev.textContent = '›';
+      chev.style.marginLeft = 'auto';
+      hdr.appendChild(chev);
     });
   </script>
 </body>
