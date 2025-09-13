@@ -27,10 +27,22 @@ jobs:
         with:
           node-version: 20.x
           cache: 'npm'
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
       - name: Install dependencies
         run: npm ci
+      - name: Build WASM (web)
+        run: npm run build:wasm
       - name: Build demo to dist/
         run: DEMO_OUT_DIR=dist npm run demo:build
+      - name: Copy pkg to dist
+        run: |
+          mkdir -p dist/pkg
+          cp -r pkg/* dist/pkg/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

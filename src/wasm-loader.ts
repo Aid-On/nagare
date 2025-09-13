@@ -45,23 +45,15 @@ export async function loadWasm(): Promise<void> {
       }
 
       if (typeof window !== 'undefined') {
-        // Browser: load wasm-pack (web target). Pass the .wasm URL to init for bundlers.
-        // Use dynamic import with any to avoid type errors when pkg is absent in typecheck
-        // @ts-ignore - generated at build time by wasm-bindgen
-        const jsPath: string = ['..','/pkg','/nagare.js'].join('');
-        // @ts-ignore - generated at build time by wasm-bindgen
-        const wasm = (await import(/* @vite-ignore */ jsPath)) as { default?: (u?: unknown) => Promise<void> | void } & Record<string, unknown>;
+        // Browser: dynamic import glue JS from /pkg and init with explicit URL for .wasm
+        const jsUrl = new URL('../pkg/nagare.js', import.meta.url).toString();
+        const wasm = (await import(/* @vite-ignore */ jsUrl)) as { default?: (u?: unknown) => Promise<void> | void } & Record<string, unknown>;
         const init = wasm.default;
         if (typeof init === 'function') {
+          const wasmUrl = new URL('../pkg/nagare_bg.wasm', import.meta.url).toString();
           try {
-            // Prefer explicit URL so Vite can rewrite asset path
-            // @ts-ignore - url emitted by bundler
-            const wasmUrlPath: string = ['..','/pkg','/nagare_bg.wasm?url'].join('');
-            // @ts-ignore - url emitted by bundler
-            const wasmUrl = (await import(/* @vite-ignore */ wasmUrlPath)) as { default: string };
-            await init(wasmUrl.default);
+            await init(wasmUrl);
           } catch {
-            // Fallback to no-arg init (will try to fetch relative to glue script)
             await init();
           }
         }
