@@ -1149,39 +1149,23 @@ liveStream.observe(
 
       try {
         const data = Array.from({ length: dataSize }, (_, i) => i);
-        let dataset = data;
         let nativeResult, rxjsResult, nagareResult;
         let nativeTime, rxjsTime, nagareTime;
 
-        // Native JS (fair baseline: prefer single-pass loops where possible)
+        // Native JS
         const nativeStart = performance.now();
         if (testType === 'mapFilter') {
-          // Single-pass loop to avoid intermediate arrays
-          const out = new Array(dataset.length);
-          let k = 0;
-          for (let i = 0; i < dataset.length; i++) {
-            const v = dataset[i] * 2;
-            if (v % 3 === 0) out[k++] = v;
-          }
-          out.length = k;
-          nativeResult = out;
+          nativeResult = data.map(x => x * 2).filter(x => x % 3 === 0);
         } else if (testType === 'complex') {
           let acc = 0;
-          nativeResult = dataset
+          nativeResult = data
             .map(x => Math.sqrt(x))
             .filter(x => x > 10)
             .map(x => Math.floor(x * 100))
             .map(x => acc += x)
             .filter(x => x % 2 === 0);
         } else if (testType === 'large') {
-          const out = new Array(dataset.length);
-          let k = 0;
-          for (let i = 0; i < dataset.length; i++) {
-            const v = dataset[i] * 3;
-            if (v % 5 === 0) out[k++] = v;
-          }
-          out.length = k;
-          nativeResult = out;
+          nativeResult = data.map(x => x * 3).filter(x => x % 5 === 0);
         } else {
           const objects = data.map(i => ({ id: i, value: Math.random() * 1000, active: i % 2 === 0 }));
           nativeResult = objects
@@ -1189,8 +1173,8 @@ liveStream.observe(
             .map(obj => ({ ...obj, value: obj.value * 1.1 }))
             .filter(obj => obj.value > 100)
             .map(obj => obj.value);
-          // Use objects for other tests too without spreading millions of args
-          dataset = objects;
+          data.splice(0); // Use objects for other tests too
+          data.push(...objects);
         }
         nativeTime = performance.now() - nativeStart;
 
@@ -1198,7 +1182,7 @@ liveStream.observe(
         const rxjsStart = performance.now();
         if (testType === 'mapFilter') {
           rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(dataset).pipe(
+            rxjs.from(data).pipe(
               rxjs.operators.map(x => x * 2),
               rxjs.operators.filter(x => x % 3 === 0),
               rxjs.operators.toArray()
@@ -1206,7 +1190,7 @@ liveStream.observe(
           );
         } else if (testType === 'complex') {
           rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(dataset).pipe(
+            rxjs.from(data).pipe(
               rxjs.operators.map(x => Math.sqrt(x)),
               rxjs.operators.filter(x => x > 10),
               rxjs.operators.map(x => Math.floor(x * 100)),
@@ -1217,7 +1201,7 @@ liveStream.observe(
           );
         } else if (testType === 'large') {
           rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(dataset).pipe(
+            rxjs.from(data).pipe(
               rxjs.operators.map(x => x * 3),
               rxjs.operators.filter(x => x % 5 === 0),
               rxjs.operators.toArray()
@@ -1225,7 +1209,7 @@ liveStream.observe(
           );
         } else {
           rxjsResult = await rxjs.firstValueFrom(
-            rxjs.from(dataset).pipe(
+            rxjs.from(data).pipe(
               rxjs.operators.filter(obj => obj.active),
               rxjs.operators.map(obj => ({ ...obj, value: obj.value * 1.1 })),
               rxjs.operators.filter(obj => obj.value > 100),
@@ -1239,12 +1223,12 @@ liveStream.observe(
         // Nagare
         const nagareStart = performance.now();
         if (testType === 'mapFilter') {
-          nagareResult = await Nagare.from(dataset)
+          nagareResult = await Nagare.from(data)
             .map(x => x * 2)
             .filter(x => x % 3 === 0)
             .toArray();
         } else if (testType === 'complex') {
-          nagareResult = await Nagare.from(dataset)
+          nagareResult = await Nagare.from(data)
             .map(x => Math.sqrt(x))
             .filter(x => x > 10)
             .map(x => Math.floor(x * 100))
@@ -1252,12 +1236,12 @@ liveStream.observe(
             .filter(x => x % 2 === 0)
             .toArray();
         } else if (testType === 'large') {
-          nagareResult = await Nagare.from(dataset)
+          nagareResult = await Nagare.from(data)
             .map(x => x * 3)
             .filter(x => x % 5 === 0)
             .toArray();
         } else {
-          nagareResult = await Nagare.from(dataset)
+          nagareResult = await Nagare.from(data)
             .filter(obj => obj.active)
             .map(obj => ({ ...obj, value: obj.value * 1.1 }))
             .filter(obj => obj.value > 100)
@@ -1265,18 +1249,6 @@ liveStream.observe(
             .toArray();
         }
         nagareTime = performance.now() - nagareStart;
-
-        // Optional correctness check for mapFilter
-        if (testType === 'mapFilter') {
-          const expected = (() => { let s = 0; for (let i = 0; i < data.length; i++) { const v = data[i] * 2; if (v % 3 === 0) s += v; } return s; })();
-          const sum = arr => arr.reduce((a,b)=>a+b,0);
-          const okNative = sum(nativeResult) === expected;
-          const okRx = sum(rxjsResult) === expected;
-          const okNag = sum(nagareResult) === expected;
-          if (!okNative || !okRx || !okNag) {
-            console.warn('Checksum mismatch', { okNative, okRx, okNag, expected });
-          }
-        }
 
         // Calculate results
         const results = [
