@@ -41,6 +41,14 @@ Notes:
   - Default runs report both fusion on/off.
 - For WebAssembly tests, use `npm run test:wasm` to run the Vitest suite with real WASM.
 
+### Fusion Toggle
+
+```typescript
+Nagare.setFusionEnabled(false); // disable array kernels (semantic, slower)
+Nagare.setFusionEnabled(true);  // enable array kernels (fast)
+Nagare.setJitMode('fast');      // or 'off' to disable codegen
+```
+
 ## ⚡ Performance First
 
 ```
@@ -114,6 +122,23 @@ using subscription = stream.observe(
     onError: error => console.error('Error:', error)
   }
 );
+
+### Common Aggregates (JIT-optimized)
+
+```typescript
+// Numbers
+const values = Nagare.from([3, 1, 4, 1, 5]);
+
+const s = await values.sum();   // 14
+const mn = await values.min();  // 1
+const mx = await values.max();  // 5
+const avg = await values.mean();// 2.8
+
+// Find with predicate
+const firstEven = await values.find(x => x % 2 === 0); // 4
+```
+
+These aggregates use the same array fast paths / fused operator chains as `reduce`, avoiding intermediate arrays.
 ```
 
 ### SIMD-Accelerated Processing
@@ -127,6 +152,11 @@ const processed = await Nagare
   .mapWasm('fft_transform')      // Fast Fourier Transform
   .mapWasm('noise_reduction')    // SIMD noise reduction
   .toArray();
+
+// Float64 support
+import { processFloat64Batch, simdMapMulAdd64 } from '@aid-on/nagare';
+const doubles = new Float64Array(1_000_000);
+const squared = await processFloat64Batch(doubles, 'square');
 ```
 
 ### Real-time WebSocket Streams
@@ -475,3 +505,14 @@ const out = await ab.toArray();
 ```
 
 `nagare.combine(...)` remains a zip-like pairing of next values.
+
+### concatMapArray (fast path)
+
+When each outer element expands to a small, fixed-size array, `concatMapArray` avoids generator overhead and can preallocate output:
+
+```typescript
+import { concatMapArray, Nagare } from '@aid-on/nagare';
+
+const out = await concatMapArray((x: number) => [x, x + 1])(Nagare.from([1,2,3])).toArray();
+// => [1,2, 2,3, 3,4]
+```

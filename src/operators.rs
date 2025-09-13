@@ -1,4 +1,4 @@
-use js_sys::Float32Array;
+use js_sys::{Float32Array, Float64Array};
 use std::collections::VecDeque;
 
 pub fn process_float32_batch(data: &Float32Array, operation: &str) -> Float32Array {
@@ -25,6 +25,29 @@ pub fn process_float32_batch(data: &Float32Array, operation: &str) -> Float32Arr
     };
     
     let result = Float32Array::new_with_length(output.len() as u32);
+    result.copy_from(&output);
+    result
+}
+
+pub fn process_float64_batch(data: &Float64Array, operation: &str) -> Float64Array {
+    let input = data.to_vec();
+    let output = match operation {
+        "square" => input.iter().map(|x| x * x).collect(),
+        "sqrt" => input.iter().map(|x| x.sqrt()).collect(),
+        "normalize" => {
+            let sum: f64 = input.iter().sum();
+            let mean = sum / input.len() as f64;
+            let variance: f64 = input.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / input.len() as f64;
+            let std_dev = variance.sqrt();
+            input.iter().map(|x| (x - mean) / std_dev).collect()
+        }
+        "cumsum" => {
+            let mut sum = 0.0f64;
+            input.iter().map(|x| { sum += x; sum }).collect()
+        }
+        _ => input,
+    };
+    let result = Float64Array::new_with_length(output.len() as u32);
     result.copy_from(&output);
     result
 }

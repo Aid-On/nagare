@@ -405,6 +405,20 @@ export async function processFloat32Batch(
   return wasmModule.process_float32_batch(data, operation);
 }
 
+export async function processFloat64Batch(
+  data: Float64Array,
+  operation: string
+): Promise<Float64Array> {
+  await ensureWasmLoaded();
+  if (!wasmModule) {
+    throw new Error('WASM module not loaded');
+  }
+  if (!wasmModule.process_float64_batch) {
+    throw new Error('process_float64_batch not available');
+  }
+  return wasmModule.process_float64_batch(data, operation);
+}
+
 export async function simdMapMulAdd(
   data: Float32Array,
   a: number,
@@ -419,4 +433,24 @@ export async function simdMapMulAdd(
   const result = nagare.mapWasm('f32x_map_mul_add', { a, b });
   
   return new Float32Array(await result.toArray());
+}
+
+export async function simdMapMulAdd64(
+  data: Float64Array,
+  a: number,
+  b: number
+): Promise<Float64Array> {
+  await ensureWasmLoaded();
+  if (!wasmModule) {
+    throw new Error('WASM module not loaded');
+  }
+  if (!wasmModule.NagareNagare || !wasmModule.NagareNagare.fromTypedArray64) {
+    // Fallback to CPU loop
+    const out = new Float64Array(data.length);
+    for (let i = 0; i < data.length; i++) out[i] = data[i] * a + b;
+    return out;
+  }
+  const nag = wasmModule.NagareNagare.fromTypedArray64(data);
+  const result = nag.mapWasm('f64x_map_mul_add', { a, b });
+  return new Float64Array(await result.toArray());
 }

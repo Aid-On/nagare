@@ -418,6 +418,11 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
         const result = wasmModule.process_float32_batch(value, kernelName);
         return result as unknown;
       }
+      if (typeof (globalThis as any).Float64Array !== 'undefined' && value instanceof (globalThis as any).Float64Array) {
+        if (!wasmModule.process_float64_batch) return value;
+        const result = wasmModule.process_float64_batch(value, kernelName);
+        return result as unknown;
+      }
       
       return value;
     }) as (value: unknown) => unknown;
@@ -911,5 +916,136 @@ export class Nagare<T, E = never> implements AsyncIterable<T> {
       acc = await reducer(acc, value);
     }
     return acc;
+  }
+
+  // Aggregates built on top of reduce/fast paths
+  async sum(this: Nagare<number>): Promise<number> {
+    // Fast array path when no upstream operators
+    const { baseSource, operators: fusedOps } = this.flattenChain();
+    if ((Array.isArray(baseSource) || isTypedArrayLike(baseSource)) && (!Nagare._fusionEnabled || fusedOps.length === 0)) {
+      const src = baseSource as { length: number; [index: number]: number };
+      let s = 0;
+      for (let i = 0; i < src.length; i++) s += src[i];
+      return s;
+    }
+    return this.reduce((a, v) => a + v, 0 as number);
+  }
+
+  async min(this: Nagare<number>): Promise<number | undefined> {
+    const { baseSource, operators: fusedOps } = this.flattenChain();
+    if (Array.isArray(baseSource) || isTypedArrayLike(baseSource)) {
+      const src = baseSource as { length: number; [index: number]: number };
+      let has = false; let m = 0;
+      if (!Nagare._fusionEnabled || fusedOps.length === 0) {
+        for (let i = 0; i < src.length; i++) { const v = src[i]; if (!has) { m = v; has = true; } else if (v < m) m = v; }
+        return has ? m : undefined;
+      } else {
+        try {
+          const fast = _compileOperatorChainUnchecked(
+            fusedOps,
+            { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+          );
+          for (let i = 0; i < src.length; i++) {
+            const r = fast(src[i]);
+            if (r !== undefined) { const v = r as unknown as number; if (!has) { m = v; has = true; } else if (v < m) m = v; }
+          }
+          return has ? m : undefined;
+        } catch {}
+      }
+    }
+    let has = false; let m = 0;
+    for await (const v of this as unknown as Nagare<number>) { if (!has) { m = v; has = true; } else if (v < m) m = v; }
+    return has ? m : undefined;
+  }
+
+  async max(this: Nagare<number>): Promise<number | undefined> {
+    const { baseSource, operators: fusedOps } = this.flattenChain();
+    if (Array.isArray(baseSource) || isTypedArrayLike(baseSource)) {
+      const src = baseSource as { length: number; [index: number]: number };
+      let has = false; let m = 0;
+      if (!Nagare._fusionEnabled || fusedOps.length === 0) {
+        for (let i = 0; i < src.length; i++) { const v = src[i]; if (!has) { m = v; has = true; } else if (v > m) m = v; }
+        return has ? m : undefined;
+      } else {
+        try {
+          const fast = _compileOperatorChainUnchecked(
+            fusedOps,
+            { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+          );
+          for (let i = 0; i < src.length; i++) {
+            const r = fast(src[i]);
+            if (r !== undefined) { const v = r as unknown as number; if (!has) { m = v; has = true; } else if (v > m) m = v; }
+          }
+          return has ? m : undefined;
+        } catch {}
+      }
+    }
+    let has = false; let m = 0;
+    for await (const v of this as unknown as Nagare<number>) { if (!has) { m = v; has = true; } else if (v > m) m = v; }
+    return has ? m : undefined;
+  }
+
+  async mean(this: Nagare<number>): Promise<number | undefined> {
+    const { baseSource, operators: fusedOps } = this.flattenChain();
+    if (Array.isArray(baseSource) || isTypedArrayLike(baseSource)) {
+      const src = baseSource as { length: number; [index: number]: number };
+      let count = 0; let sum = 0;
+      if (!Nagare._fusionEnabled || fusedOps.length === 0) {
+        for (let i = 0; i < src.length; i++) { sum += src[i]; count++; }
+        return count ? (sum / count) : undefined;
+      } else {
+        try {
+          const fast = _compileOperatorChainUnchecked(
+            fusedOps,
+            { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+          );
+          for (let i = 0; i < src.length; i++) {
+            const r = fast(src[i]);
+            if (r !== undefined) { sum += (r as unknown as number); count++; }
+          }
+          return count ? (sum / count) : undefined;
+        } catch {}
+      }
+    }
+    let count = 0; let sum = 0;
+    for await (const v of this as unknown as Nagare<number>) { sum += v; count++; }
+    return count ? (sum / count) : undefined;
+  }
+
+  async find(predicate: (value: T) => boolean | Promise<boolean>): Promise<T | undefined> {
+    const { baseSource, operators: fusedOps } = this.flattenChain();
+    if (Array.isArray(baseSource) || isTypedArrayLike(baseSource)) {
+      const src = baseSource as { length: number; [index: number]: T };
+      // Fused fast path
+      if (Nagare._fusionEnabled && fusedOps.length > 0) {
+        try {
+          const fast = _compileOperatorChainUnchecked(
+            fusedOps,
+            { jitMode: Nagare._jitMode, ASYNC_DETECTED: Nagare.ASYNC_DETECTED }
+          );
+          for (let i = 0; i < src.length; i++) {
+            const r = fast(src[i]);
+            if (r !== undefined) {
+              const p = predicate(r as T);
+              const ok = p instanceof Promise ? await p : p;
+              if (ok) return r as T;
+            }
+          }
+          return undefined;
+        } catch {}
+      }
+      // Simple scan
+      for (let i = 0; i < src.length; i++) {
+        const p = predicate(src[i] as T);
+        const ok = p instanceof Promise ? await p : p;
+        if (ok) return src[i] as T;
+      }
+      return undefined;
+    }
+    for await (const v of this) {
+      const ok = predicate(v);
+      if (ok instanceof Promise ? await ok : ok) return v;
+    }
+    return undefined;
   }
 }

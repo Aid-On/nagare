@@ -10,7 +10,10 @@ export default defineConfig({
   // Use relative base so it works under any Pages path (repo or subfolder)
   base: './',
   build: {
-    outDir: resolve(__dirname, '../docs'), // Output to docs folder for GitHub Pages
+    // Allow override via env for GitHub Actions pages deployment
+    outDir: process.env.DEMO_OUT_DIR
+      ? resolve(__dirname, '..', process.env.DEMO_OUT_DIR)
+      : resolve(__dirname, '../docs'), // Default to docs folder for GitHub Pages (branch)
     emptyOutDir: true,
     rollupOptions: {
       input: {

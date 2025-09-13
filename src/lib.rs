@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use js_sys::{Uint8Array, Float32Array, ArrayBuffer};
+use js_sys::{Uint8Array, Float32Array, Float64Array, ArrayBuffer};
 
 // Heavy modules are behind feature flags; minimal web build does not compile them
 #[cfg(feature = "river")]
@@ -28,6 +28,11 @@ pub fn init() {
 pub fn process_float32_batch(data: &Float32Array, operation: &str) -> Float32Array {
     // Delegate to operators module (pure Rust)
     operators::process_float32_batch(data, operation)
+}
+
+#[wasm_bindgen]
+pub fn process_float64_batch(data: &Float64Array, operation: &str) -> Float64Array {
+    operators::process_float64_batch(data, operation)
 }
 
 #[wasm_bindgen]
@@ -81,4 +86,9 @@ pub fn create_zero_copy_view(buffer: &ArrayBuffer) -> Uint8Array {
 #[wasm_bindgen]
 pub fn create_float32_view(buffer: &ArrayBuffer) -> Float32Array {
     js_sys::Float32Array::new(buffer)
+}
+
+#[wasm_bindgen]
+pub fn create_float64_view(buffer: &ArrayBuffer) -> Float64Array {
+    js_sys::Float64Array::new(buffer)
 }
