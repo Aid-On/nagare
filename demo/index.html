@@ -1170,7 +1170,7 @@ liveStream.observe(
   <!-- Scripts -->
   <script type="module" src="./nagare.mjs"></script>
   <script type="module">
-    import { Nagare, concatMapArray, processFloat32Batch, processFloat64Batch } from '@aid-on/nagare';
+    import { Nagare, concatMapArray, processFloat32Batch, processFloat64Batch, wasmMapMulAdd32, wasmFilterGt32, wasmSlidingMean32, wasmGenArange32, wasmSanitize32 } from '@aid-on/nagare';
     // Nagare is imported from '@aid-on/nagare' via Vite alias at top of this module script
     console.log('Nagare loaded successfully');
 
@@ -1457,6 +1457,53 @@ liveStream.observe(
       });
     }
 
+    // Transform demo via WASM (map *2 then filter > threshold=6)
+    document.getElementById('runTransform').addEventListener('click', async () => {
+      const input = new Float32Array([1,2,3,4,5,6,7,8,9]);
+      const doubled = await wasmMapMulAdd32(input, 2.0, 0.0);
+      const filtered = await wasmFilterGt32(doubled, 6.0);
+      document.getElementById('transformResult').textContent = JSON.stringify(Array.from(filtered));
+    });
+
+    // Window demo via WASM
+    document.getElementById('runWindow').addEventListener('click', async () => {
+      const data = new Float32Array([1,2,3,4,5,6,7,8,9]);
+      const out = await wasmSlidingMean32(data, 3);
+      document.getElementById('windowResult').textContent = JSON.stringify(Array.from(out).map(x => Math.round(x)));
+    });
+
+    // Error demo via WASM sanitize
+    document.getElementById('runError').addEventListener('click', async () => {
+      const arr = new Float32Array([1, Number.NaN, 3, Number.POSITIVE_INFINITY, 5]);
+      const safe = await wasmSanitize32(arr);
+      document.getElementById('errorResult').textContent = JSON.stringify(Array.from(safe));
+      const recovered = Array.from(safe).filter(x => x === 0).length;
+      document.getElementById('errorStatus').textContent = `✅ ${recovered}/5 items recovered`;
+    });
+
+    // Merge demo: generate sequences in WASM then interleave in UI
+    // Declare once at top scope
+    var mergeTimers = [];
+    document.getElementById('runMerge').addEventListener('click', async () => {
+      mergeTimers.forEach(t => clearInterval(t));
+      mergeTimers = [];
+      const a = await wasmGenArange32(50, 1, 2);
+      const b = await wasmGenArange32(50, 2, 2);
+      const c = await wasmGenArange32(50, 7, 1);
+      const aOut = [], bOut = [], cOut = [], merged = [];
+      const update = () => {
+        document.getElementById('streamA').textContent = `[${aOut.slice(-8).join(', ')}]`;
+        document.getElementById('streamB').textContent = `[${bOut.slice(-8).join(', ')}]`;
+        document.getElementById('streamC').textContent = `[${cOut.slice(-8).join(', ')}]`;
+        document.getElementById('mergedResult').textContent = `[${merged.slice(-12).join(', ')}]`;
+      };
+      let i=0,j=0,k=0;
+      mergeTimers.push(setInterval(() => { if (i<a.length){ const v=a[i++]; aOut.push(v); merged.push(`A:${v}`); update(); }}, 100));
+      mergeTimers.push(setInterval(() => { if (j<b.length){ const v=b[j++]; bOut.push(v); merged.push(`B:${v}`); update(); }}, 150));
+      mergeTimers.push(setInterval(() => { if (k<c.length){ const v=c[k++]; cOut.push(v); merged.push(`C:${v}`); update(); }}, 220));
+      setTimeout(() => { mergeTimers.forEach(t => clearInterval(t)); mergeTimers=[]; }, 6000);
+    });
+
     // Real-time stream demo
     let realtimeSubscription = null;
     document.getElementById('startRealtime').addEventListener('click', () => {
@@ -1486,55 +1533,7 @@ liveStream.observe(
       }
     });
 
-    // Other demo handlers (reset to deterministic, always-working behavior)
-    let mergeTimers = [];
-    document.getElementById('runMerge').addEventListener('click', () => {
-      mergeTimers.forEach(t => clearInterval(t));
-      mergeTimers = [];
-      const aOut = [], bOut = [], cOut = [], merged = [];
-      const update = () => {
-        document.getElementById('streamA').textContent = `[${aOut.slice(-8).join(', ')}]`;
-        document.getElementById('streamB').textContent = `[${bOut.slice(-8).join(', ')}]`;
-        document.getElementById('streamC').textContent = `[${cOut.slice(-8).join(', ')}]`;
-        document.getElementById('mergedResult').textContent = `[${merged.slice(-12).join(', ')}]`;
-      };
-      let i=0,j=0,k=0;
-      mergeTimers.push(setInterval(() => { aOut.push(1+2*i); merged.push(`A:${1+2*i}`); i++; update(); }, 120));
-      mergeTimers.push(setInterval(() => { bOut.push(2+2*j); merged.push(`B:${2+2*j}`); j++; update(); }, 180));
-      mergeTimers.push(setInterval(() => { cOut.push(7+k);   merged.push(`C:${7+k}`);   k++; update(); }, 250));
-      setTimeout(() => { mergeTimers.forEach(t => clearInterval(t)); mergeTimers=[]; }, 6000);
-    });
-
-    document.getElementById('runError').addEventListener('click', () => {
-      const input = [1, 'bad', 3, null, 5];
-      const safe = input.map(v => {
-        const n = Number(v);
-        return Number.isFinite(n) ? n : 0; // rescue
-      }).filter(x => x >= 0);
-      document.getElementById('errorResult').textContent = `[${safe.join(', ')}]`;
-      const recovered = input.length - safe.filter(x=>x!==0).length;
-      document.getElementById('errorStatus').textContent = `✅ ${recovered}/5 items recovered`;
-    });
-
-    document.getElementById('runWindow').addEventListener('click', () => {
-      const data = [1,2,3,4,5,6,7,8,9];
-      const W = 3;
-      const out = [];
-      for (let i = 0; i <= data.length - W; i++) {
-        let s = 0; for (let k = 0; k < W; k++) s += data[i+k];
-        out.push(Math.round(s/W));
-      }
-      document.getElementById('windowResult').textContent = `[${out.join(', ')}]`;
-    });
-
-    document.getElementById('runOperators').addEventListener('click', () => {
-      const src = [1,2,3,4,5,6,7];
-      const skipped = src.slice(2);
-      const taken = skipped.slice(0,5);
-      const scanned = [];
-      let acc = 0; for (let v of taken) { acc += v; scanned.push(acc); }
-      document.getElementById('operatorResult').textContent = `[${scanned.join(', ')}]`;
-    });
+    // (Removed duplicate non-WASM versions)
 
     // Accordion for code examples
     document.querySelectorAll('.code-example').forEach((ex) => {
