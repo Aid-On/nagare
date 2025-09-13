@@ -1,0 +1,38 @@
+name: Deploy Demo (docs)
+
+on:
+  push:
+    branches: [ main ]
+    # Avoid infinite loop when only docs/ changes are pushed by this workflow
+    paths-ignore:
+      - 'docs/**'
+  workflow_dispatch: {}
+
+jobs:
+  build-and-commit-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build demo into docs/
+        run: npm run demo:build
+
+      - name: Commit updated docs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore(docs): auto-build demo (docs/)'
+          branch: main
+          file_pattern: docs/**
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+
