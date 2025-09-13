@@ -1,4 +1,5 @@
-export const OP_META = Symbol('nagare.op.meta');
+// Use global registry to preserve identity across bundles/chunks
+export const OP_META = Symbol.for('nagare.op.meta');
 
 export type OpMeta =
   | { kind: 'map' }

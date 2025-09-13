@@ -20,6 +20,27 @@
 
 Nagare is a next-generation stream processing library that delivers **5-10x performance** improvements over traditional JavaScript stream libraries. Built with Rust/WASM for compute-heavy workloads, SIMD acceleration, and designed specifically for edge computing environments like Cloudflare Workers.
 
+## Benchmarks
+
+We include a checksum-verified benchmark suite to compare Nagare, RxJS and native loops on common streaming patterns.
+
+- Map + Filter (array sources)
+- Reduce (sum) over arrays
+- ConcatMap (outer × inner)
+
+Run:
+
+```
+npm run build:ts && node benches/standard-suite.mjs
+```
+
+Notes:
+- The suite validates outputs via checksums to prevent “too good to be true” results.
+- You can toggle array fusion (JIT-compiled kernels) programmatically:
+  - `Nagare.setFusionEnabled(true|false)`
+  - Default runs report both fusion on/off.
+- For WebAssembly tests, use `npm run test:wasm` to run the Vitest suite with real WASM.
+
 ## ⚡ Performance First
 
 ```
@@ -442,3 +463,15 @@ MIT © [Aid-On](https://github.com/Aid-On)
   <br>
   <sub>Making streams flow faster at the edge</sub>
 </div>
+## Combinators
+
+### combineLatest
+
+`nagare.combineLatest(a, b, ...)` behaves like RxJS combineLatest: it emits only after all sources have produced at least one value, then re-emits when any source updates.
+
+```
+const ab = nagare.combineLatest(streamA, streamB);
+const out = await ab.toArray();
+```
+
+`nagare.combine(...)` remains a zip-like pairing of next values.
