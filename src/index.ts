@@ -1,13 +1,5 @@
 export { Nagare } from './nagare';
 export * from './operators';
-// Explicitly re-export WASM demo helpers to satisfy rollup static analysis
-export { 
-  wasmMapMulAdd32,
-  wasmFilterGt32,
-  wasmSlidingMean32,
-  wasmGenArange32,
-  wasmSanitize32,
-} from './operators';
 export { 
   BYOBStreamReader, 
   BYOBStreamController, 
