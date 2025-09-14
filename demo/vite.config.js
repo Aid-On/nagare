@@ -23,7 +23,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@aid-on/nagare': resolve(__dirname, '../src/index.ts'),
+      '@aid-on/nagare': resolve(__dirname, '../src'),
     },
   },
   plugins: [wasm()],
