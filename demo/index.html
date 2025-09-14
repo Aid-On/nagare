@@ -1161,9 +1161,9 @@ liveStream.observe(
   </main>
 
   <!-- Scripts -->
-  <script type="module" src="./nagare.mjs"></script>
   <script type="module">
-    import { Nagare, concatMapArray, processFloat32Batch, processFloat64Batch, wasmMapMulAdd32, wasmFilterGt32, wasmSlidingMean32, wasmGenArange32, wasmSanitize32 } from '@aid-on/nagare';
+    import { Nagare, concatMapArray, processFloat32Batch, processFloat64Batch } from '@aid-on/nagare';
+    import { wasmMapMulAdd32, wasmFilterGt32, wasmSlidingMean32, wasmGenArange32, wasmSanitize32 } from '@aid-on/nagare/operators';
     // Nagare is imported from '@aid-on/nagare' via Vite alias at top of this module script
     console.log('Nagare loaded successfully');
 
