@@ -1317,16 +1317,10 @@ liveStream.observe(
         summary.style.display = 'block';
 
         // Summary message
-        const winner = results[0];
-        const speedupVsSecond = (results[1].time / winner.time).toFixed(1);
-        
-        if (winner.name === 'nagare') {
-          document.getElementById('summaryText').innerHTML = 
-            `🎉 <strong>Nagare wins!</strong> ${speedupVsSecond}x faster than ${results[1].label}`;
-        } else {
-          document.getElementById('summaryText').innerHTML = 
-            `🏆 <strong>${winner.label} wins!</strong> Beat Nagare by ${(nagareTime / winner.time).toFixed(1)}x`;
-        }
+        // Neutral summary without winner phrasing
+        const rxLabel = results.find(r => r.name === 'rxjs')?.label || 'Reference';
+        document.getElementById('summaryText').innerHTML =
+          `Summary: Nagare ${nagareTime.toFixed(2)}ms · ${rxLabel} ${rxjsTime.toFixed(2)}ms`;
 
         status.innerHTML = '<div class="status success">✅ Benchmark completed successfully</div>';
 
