@@ -829,6 +829,12 @@ rescue: 🌊 1 ─ 0 ─ 3 ─ 0 ─ 5</pre>
             <br>
             Result: <span id="operatorResult">[click to demo]</span>
           </div>
+          <pre class="river-map">source   : 🌊 1 ─ 2 ─ 3 ─ 4 ─ 5 ─ 6 ─ 7
+scan     : 🌊 1 ─ 3 ─ 6 ─ 10 ─ 15 ─ 21 ─ 28
+take(5)  : 🌊 1 ─ 3 ─ 6 ─ 10 ─ 15
+skip(2)  : 🌊         6 ─ 10 ─ 15
+pairwise : 🌊 [1,2] ─ [2,3] ─ [3,4] ─ …
+distinct : 🌊 1 ─ 2 ─ 3</pre>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runOperators">▶ Run Demo</button>
           </div>
@@ -868,6 +874,8 @@ rescue: 🌊 1 ─ 0 ─ 3 ─ 0 ─ 5</pre>
             </div>
             <div>Time: <span id="simdTime">-</span> · Sample: <span id="simdSample">-</span></div>
           </div>
+          <pre class="river-map">Float32: 🌊 f32 buffer → [ square ] → out
+Float64: 🌊 f64 buffer → [ square ] → out</pre>
         </div>
       </div>
     </section>
