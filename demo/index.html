@@ -791,7 +791,8 @@
             Data: <span id="windowData">[1,2,3,4,5,6,7,8,9]</span><br>
             Window Size: <span id="windowSize">3</span><br>
             ──────────────────────────────<br>
-            Rolling Avg: <span id="windowResult">[2, 3, 4, 5, 6, 7]</span>
+            Rolling Avg: <span id="windowResult">[2, 3, 4, 5, 6, 7]</span><br>
+            Sparkline: <span id="windowSpark">▂▃▄▅▆▇█</span>
           </div>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runWindow">▶ Window Demo</button>
@@ -849,6 +850,7 @@
             <div class="demo-controls">
               <button class="btn btn-sm" id="runSIMD32">▶ Float32 square</button>
               <button class="btn btn-sm" id="runSIMD64">▶ Float64 square</button>
+              <button class="btn btn-sm" id="runSIMDCompare">⚖ Compare (JS vs WASM)</button>
             </div>
             <div>Time: <span id="simdTime">-</span> · Sample: <span id="simdSample">-</span></div>
           </div>
@@ -1411,6 +1413,30 @@ liveStream.observe(
       });
     }
 
+    // JS vs WASM simple comparison
+    const runSIMDCompare = document.getElementById('runSIMDCompare');
+    if (runSIMDCompare) {
+      runSIMDCompare.addEventListener('click', async () => {
+        const n = parseInt((document.getElementById('simdLen')).value) || 200000;
+        const arr = new Float32Array(n);
+        for (let i = 0; i < n; i++) arr[i] = (i % 100) / 10;
+        // JS baseline
+        const t0 = performance.now();
+        const js = new Float32Array(n);
+        for (let i = 0; i < n; i++) js[i] = arr[i] * arr[i];
+        const t1 = performance.now();
+        // WASM
+        const t2 = performance.now();
+        const wasmOut = await processFloat32Batch(arr, 'square');
+        const t3 = performance.now();
+        const jsMs = (t1 - t0);
+        const wasmMs = (t3 - t2);
+        const speedup = (jsMs / wasmMs).toFixed(1);
+        document.getElementById('simdTime').textContent = `JS ${jsMs.toFixed(2)}ms · WASM ${wasmMs.toFixed(2)}ms · ${speedup}x`;
+        document.getElementById('simdSample').textContent = `[${wasmOut[0].toFixed(2)}, ${wasmOut[1].toFixed(2)}, ...]`;
+      });
+    }
+
     // Transform demo (stable)
     document.getElementById('runTransform').addEventListener('click', async () => {
       const input = [1,2,3,4,5,6,7,8,9];
@@ -1428,6 +1454,12 @@ liveStream.observe(
         out.push(Math.round(s / W));
       }
       document.getElementById('windowResult').textContent = JSON.stringify(out);
+      // Simple ASCII sparkline
+      const blocks = ['▁','▂','▃','▄','▅','▆','▇','█'];
+      const min = Math.min(...out), max = Math.max(...out);
+      const span = (max - min) || 1;
+      const spark = out.map(v => blocks[Math.min(7, Math.floor(((v - min) / span) * 7))]).join('');
+      document.getElementById('windowSpark').textContent = spark;
     });
 
     // Error demo (stable)

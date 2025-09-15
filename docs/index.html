@@ -569,7 +569,7 @@
       color: var(--primary);
     }
   </style>
-  <script type="module" crossorigin src="./assets/main-xXIngUdp.js"></script>
+  <script type="module" crossorigin src="./assets/main-lAbGaMpS.js"></script>
 </head>
 <body>
   <!-- Header -->
@@ -792,7 +792,8 @@
             Data: <span id="windowData">[1,2,3,4,5,6,7,8,9]</span><br>
             Window Size: <span id="windowSize">3</span><br>
             ──────────────────────────────<br>
-            Rolling Avg: <span id="windowResult">[2, 3, 4, 5, 6, 7]</span>
+            Rolling Avg: <span id="windowResult">[2, 3, 4, 5, 6, 7]</span><br>
+            Sparkline: <span id="windowSpark">▂▃▄▅▆▇█</span>
           </div>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runWindow">▶ Window Demo</button>
@@ -850,6 +851,7 @@
             <div class="demo-controls">
               <button class="btn btn-sm" id="runSIMD32">▶ Float32 square</button>
               <button class="btn btn-sm" id="runSIMD64">▶ Float64 square</button>
+              <button class="btn btn-sm" id="runSIMDCompare">⚖ Compare (JS vs WASM)</button>
             </div>
             <div>Time: <span id="simdTime">-</span> · Sample: <span id="simdSample">-</span></div>
           </div>
