@@ -403,6 +403,9 @@
       font-size: 0.875rem;
       margin-bottom: 1rem;
     }
+    .river-map { background: var(--bg); border: 1px dashed var(--border); border-radius: 0.5rem; padding: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; line-height: 1.4; color: var(--text-dim); white-space: pre; }
+    .river-map .label { color: var(--text); font-weight: 600; }
+    .river-map .muted { opacity: 0.5; }
 
     .demo-controls {
       display: flex;
@@ -719,6 +722,9 @@
             ↓ .filter(x => x % 3 === 0)<br>
             Output: <span id="transformResult">[6, 12, 18]</span>
           </div>
+          <pre class="river-map">source  : 🌊  1 ─ 2 ─ 3 ─ 4 ─ 5 ─ 6 ─ 7 ─ 8 ─ 9
+map     : 🌊  2 ─ 4 ─ 6 ─ 8 ─ 10 ─ 12 ─ 14 ─ 16 ─ 18
+filter  : 🌊  6 ──── · ──── 12 ──── · ──── 18</pre>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runTransform">▶ Run Demo</button>
           </div>
@@ -757,6 +763,10 @@
             ───────────────────────────────<br>
             Merged: <span id="mergedResult">[click to start]</span>
           </div>
+          <pre class="river-map">A  : 🌊 1 ─── 3 ─── 5 ─── 7
+B  : 🌊 ── 2 ─── 4 ─── 6 ──
+C  : 🌊 ──── 7 ─── 8 ─── 9
+merge: 🌊 1 ─ 2 ─ 3 ─ 4 ─ 5 ─ 6 ─ 7 ─ 8 ─ 9</pre>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runMerge">▶ Merge Demo</button>
           </div>
@@ -776,6 +786,8 @@
             <br>
             Status: <span id="errorStatus">✅ 4/5 items recovered</span>
           </div>
+          <pre class="river-map">source: 🌊 1 ─ ✖ ─ 3 ─ ✖ ─ 5
+rescue: 🌊 1 ─ 0 ─ 3 ─ 0 ─ 5</pre>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runError">▶ Error Demo</button>
           </div>
@@ -795,6 +807,7 @@
             Rolling Avg: <span id="windowResult">[2, 3, 4, 5, 6, 7]</span><br>
             Sparkline: <span id="windowSpark">▂▃▄▅▆▇█</span>
           </div>
+          <pre class="river-map">⟦1 2 3⟧ → 2 | ⟦2 3 4⟧ → 3 | ⟦3 4 5⟧ → 4 | ⟦4 5 6⟧ → 5</pre>
           <div class="demo-controls">
             <button class="btn btn-sm" id="runWindow">▶ Window Demo</button>
             <button class="btn btn-sm" id="visualizeWindow">📊 Visualize</button>
