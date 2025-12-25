@@ -1,22 +1,180 @@
 # @aid-on/nagare
 
-[![npm version](https://img.shields.io/npm/v/@aid-on/nagare.svg)](https://www.npmjs.com/package/@aid-on/nagare)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<div align="center">
 
-**nagare** (流れ, "flow" in Japanese) is a universal streaming interface built on Web Streams API, designed for edge computing environments. It provides a fluent, type-safe API with reactive extensions for modern TypeScript applications.
+[![npm version](https://img.shields.io/npm/v/@aid-on/nagare.svg?style=flat-square&color=00DC82)](https://www.npmjs.com/package/@aid-on/nagare)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@aid-on/nagare?style=flat-square&color=FF6B6B)](https://bundlephobia.com/package/@aid-on/nagare)
 
-[日本語版 README はこちら](./README.ja.md)
+<br />
 
-## Features
+<h3>
+<b>nagare</b> (流れ) - The Missing Stream Primitive for Edge Computing
+</h3>
 
-- 🌊 **Web Streams Native**: Built on the standard Web Streams API
-- 🚀 **Edge-Ready**: Optimized for Cloudflare Workers, Deno Deploy, and other edge runtimes
-- 🔄 **Reactive Extensions**: RxJS-like operators with backpressure support
-- 🎯 **Type-Safe**: Full TypeScript support with strict typing
-- 🔧 **Composable**: Chain operators for complex stream transformations
-- ⚡ **High Performance**: Minimal overhead, zero dependencies
-- 🌐 **Universal**: Works in browsers, Node.js, Deno, and edge environments
+<p align="center">
+<b>Not just another streaming library.</b><br/>
+The <i>only</i> library that makes ReadableStream a first-class citizen with reactive extensions.
+</p>
+
+<br/>
+
+[**日本語**](./README.ja.md) | **English**
+
+<br/>
+
+</div>
+
+## Why nagare is Different
+
+### 🎯 **The ONLY Library That...**
+
+#### **1. Makes ReadableStream<T> the Primary Interface**
+```typescript
+// ❌ Other libraries: Wrap streams in proprietary objects
+const rxjsStream = from(readableStream); // Observable wrapper
+const mostStream = fromReadable(readableStream); // Most.js wrapper
+
+// ✅ nagare: Stream<T> IS ReadableStream<T> + methods
+const nagareStream = stream.from(readableStream); // Zero overhead
+nagareStream instanceof ReadableStream; // true! 
+```
+
+#### **2. Zero-Cost Reactive Programming**
+```typescript
+// ❌ RxJS: 100KB+ for basic streaming
+import { Observable, from, map, filter } from 'rxjs';
+
+// ✅ nagare: 10KB total, tree-shakeable
+import { stream } from '@aid-on/nagare';
+// Native performance, no wrapper objects
+```
+
+#### **3. Built for Edge, Not Retrofitted**
+```typescript
+// ❌ Node.js streams: Need polyfills in edge
+// ❌ RxJS: Designed for browsers, not edge workers
+
+// ✅ nagare: Native edge runtime support
+export default {
+  async fetch(request) {
+    return stream
+      .fromSSE('/api/chat')
+      .mapAsync(processWithAI)
+      .toResponse(); // Direct to Response object!
+  }
+}
+```
+
+## Unique Features You Won't Find Elsewhere
+
+### 🚀 **Order-Preserving Concurrent Processing**
+```typescript
+// Process 10 items concurrently but maintain order!
+const results = await stream
+  .array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+  .mapAsync(async (n) => {
+    await delay(Math.random() * 1000); // Random delays
+    return n * 2;
+  }, 10) // Concurrency: 10
+  .collect();
+
+console.log(results); // ALWAYS [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+// Order preserved despite concurrent execution!
+```
+
+### 💫 **Automatic Backpressure Handling**
+```typescript
+// Stream automatically pauses when consumer is slow
+stream.subscribe({
+  next: async (value) => {
+    await heavyProcessing(value); // Stream waits!
+    // No memory overflow, no lost data
+  }
+});
+```
+
+### 🔄 **Native SSE with Cross-Platform Line Endings**
+```typescript
+// Works with ANY server (Windows, Unix, Mac)
+const events = await stream.fromSSE('/api/events');
+// Automatically handles \r\n, \n, and \r line endings
+```
+
+### 🎭 **Dual Interface: Reactive + Imperative**
+```typescript
+// Choose your style!
+
+// Reactive (pull-based)
+const s1 = stream.from(source)
+  .map(x => x * 2)
+  .filter(x => x > 10);
+
+// Imperative (push-based)
+const s2 = stream.create((controller) => {
+  controller.next(1);
+  controller.next(2);
+  controller.complete();
+});
+```
+
+## Performance Comparison
+
+| Feature | **nagare** | RxJS | Node Streams | Most.js |
+|---------|------------|------|--------------|---------|
+| Bundle Size | **10KB** | 100KB+ | N/A (Node) | 40KB |
+| Edge Support | **Native** | Polyfill | Polyfill | Polyfill |
+| Backpressure | **Automatic** | Manual | Yes | Manual |
+| Order-preserving concurrency | **Yes** | No | No | No |
+| Direct to Response | **Yes** | No | No | No |
+| Tree-shakeable | **Yes** | Partial | No | Yes |
+| Zero dependencies | **Yes** | No | No | No |
+
+## Real-World Edge Examples
+
+### AI Streaming Response (Cloudflare Workers)
+```typescript
+export default {
+  async fetch(request: Request) {
+    const aiStream = stream.create<string>((controller) => {
+      // Stream AI responses as they generate
+      const response = await ai.complete(prompt, {
+        stream: true,
+        onToken: (token) => controller.next(token)
+      });
+    });
+
+    return aiStream
+      .tap(token => metrics.record(token))
+      .throttle(50) // Prevent client overflow
+      .toSSE()
+      .toResponse({
+        headers: { 
+          'Content-Type': 'text/event-stream',
+          'X-Powered-By': 'nagare'
+        }
+      });
+  }
+};
+```
+
+### Real-time Data Pipeline
+```typescript
+const pipeline = stream
+  .fromSSE('/api/market-data')
+  .mapAsync(async data => {
+    // Parallel enrichment with order preservation
+    const [analysis, prediction] = await Promise.all([
+      analyzeMarket(data),
+      predictTrend(data)
+    ]);
+    return { ...data, analysis, prediction };
+  }, 5) // Process 5 concurrently
+  .buffer(10) // Batch for efficiency
+  .tap(batch => database.insert(batch))
+  .debounce(100); // Prevent UI thrashing
+```
 
 ## Installation
 
@@ -24,302 +182,55 @@
 npm install @aid-on/nagare
 ```
 
-```bash
-yarn add @aid-on/nagare
-```
-
-```bash
-pnpm add @aid-on/nagare
-```
-
 ## Quick Start
 
 ```typescript
 import { stream } from '@aid-on/nagare';
 
-// Create a stream from an array
-const numbers = stream.array([1, 2, 3, 4, 5]);
-
-// Transform with operators
-const result = await numbers
+// Your first nagare stream
+const result = await stream
+  .array([1, 2, 3, 4, 5])
   .map(x => x * 2)
-  .filter(x => x > 4)
+  .filter(x => x > 5)
   .collect();
 
 console.log(result); // [6, 8, 10]
 ```
 
-## Core Concepts
+## The nagare Philosophy
 
-### Stream Creation
+1. **Streams are the primitive** - Not observables, not promises
+2. **Edge-first** - Built for Cloudflare, Deno, Bun from day one
+3. **Zero magic** - What you see is what runs
+4. **Type safety** - Full TypeScript with no compromises
+5. **Web standards** - ReadableStream is the foundation
 
-```typescript
-// From array
-const s1 = stream.array([1, 2, 3]);
+## Who Should Use nagare?
 
-// From ReadableStream
-const s2 = stream.from(readableStream);
-
-// From async generator
-async function* generate() {
-  yield 1;
-  yield 2;
-  yield 3;
-}
-const s3 = stream.from(ReadableStream.from(generate()));
-
-// Create with imperative push (perfect for real-time data)
-const s4 = stream.create<number>((controller) => {
-  controller.next(1);
-  controller.next(2);
-  controller.next(3);
-  controller.complete();
-});
-
-// From SSE endpoint
-const events = await stream.fromSSE('/api/events');
-```
-
-### Stream Transformation
-
-```typescript
-const transformed = stream
-  .array([1, 2, 3, 4, 5])
-  .map(x => x * 2)                    // Multiply by 2
-  .filter(x => x > 5)                 // Keep only > 5
-  .mapAsync(async x => {              // Async transformation
-    const result = await fetch(`/api/data/${x}`);
-    return result.json();
-  }, 3)                                // Concurrency of 3
-  .tap(data => console.log(data))     // Side effects
-  .buffer(10)                          // Buffer 10 items
-  .debounce(100);                      // Debounce 100ms
-```
-
-### Operators
-
-#### Transformation
-- `map<U>(fn: (value: T) => U)` - Transform each value
-- `mapAsync<U>(fn: (value: T) => Promise<U>, concurrency?: number)` - Async transformation with concurrency control and **order preservation**
-- `filter(predicate: (value: T) => boolean)` - Filter values
-- `scan<U>(fn: (acc: U, value: T) => U, initial: U)` - Accumulate values
-- `expand(fn: (value: T) => T[])` - Expand single values to multiple
-- `compact()` - Remove null/undefined values
-
-#### Flow Control
-- `take(count: number)` - Take first N values
-- `takeUntil(predicate: (value: T) => boolean)` - Take until condition
-- `debounce(ms: number)` - Debounce by milliseconds
-- `throttle(ms: number)` - Throttle with trailing edge support
-- `buffer(size: number)` - Buffer into arrays
-- `batch(size: number)` - Alias for buffer
-
-#### Side Effects
-- `tap(fn: (value: T) => void, options?: { rethrow?: boolean })` - Perform side effects with configurable error handling
-
-#### Combination
-- `merge(...streams: Stream<T>[])` - Merge multiple streams
-- `concat(stream: Stream<T>)` - Concatenate streams
-
-### Consumption
-
-```typescript
-// Collect all values into array
-const array = await stream.collect();
-
-// Convert to Response (for edge workers)
-const response = stream.toResponse({
-  headers: { 'Content-Type': 'application/json' }
-});
-
-// Convert to SSE format
-const sseStream = stream.toSSE();
-
-// Subscribe with observer pattern
-const subscription = stream.subscribe({
-  next: (value) => console.log(value),
-  error: (err) => console.error(err),
-  complete: () => console.log('Done')
-});
-
-// Later: unsubscribe
-subscription.unsubscribe();
-
-// Async iteration
-for await (const value of stream) {
-  console.log(value);
-}
-```
-
-## Advanced Features
-
-### Backpressure Support
-
-Subscribe handles backpressure automatically:
-
-```typescript
-stream.subscribe({
-  next: async (value) => {
-    // Stream waits for async processing
-    await processData(value);
-  }
-});
-```
-
-### Multiple Subscriptions
-
-Streams are single-consumer by default. Use `tee()` for multiple consumers:
-
-```typescript
-const original = stream.array([1, 2, 3]);
-const [stream1, stream2] = original.tee();
-
-// Convert back to Stream
-const s1 = stream.from(stream1);
-const s2 = stream.from(stream2);
-
-s1.subscribe({ next: v => console.log('A:', v) });
-s2.subscribe({ next: v => console.log('B:', v) });
-```
-
-### SSE (Server-Sent Events)
-
-Perfect for real-time streaming from edge workers:
-
-```typescript
-// Client
-const events = await stream.fromSSE<MessageEvent>('/api/chat', {
-  method: 'POST',
-  body: { prompt: 'Hello' }
-});
-
-events.subscribe({
-  next: (event) => console.log(event.data)
-});
-
-// Server (Edge Worker)
-export default {
-  async fetch(request: Request) {
-    const dataStream = stream.create<string>((controller) => {
-      controller.next('Hello');
-      controller.next('World');
-      controller.complete();
-    });
-
-    return dataStream
-      .toSSE()
-      .toResponse({
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache'
-        }
-      });
-  }
-};
-```
-
-## Platform Support
-
-- ✅ Cloudflare Workers
-- ✅ Deno / Deno Deploy
-- ✅ Node.js 18+
-- ✅ Bun
-- ✅ Modern Browsers (Chrome, Firefox, Safari, Edge)
-- ✅ Vercel Edge Runtime
-- ✅ Netlify Edge Functions
-
-## Performance
-
-Nagare is designed for minimal overhead:
-
-- Zero dependencies
-- Small bundle size (~10KB gzipped)
-- Leverages native Web Streams for optimal performance
-- Lazy evaluation - operators don't execute until consumed
-- Automatic resource cleanup
-
-## API Reference
-
-### Main Exports
-
-```typescript
-import {
-  stream,           // Main stream factory
-  Stream,           // Stream type
-  StreamPipeOptions, // Pipe options type
-  operators,        // Low-level operators
-  fromArray,        // Create from array
-  fromReadableStream // Create from ReadableStream
-} from '@aid-on/nagare';
-```
-
-### Stream Interface
-
-```typescript
-interface Stream<T> {
-  // Native Web Streams
-  readable: ReadableStream<T>;
-  pipeTo(destination: WritableStream<T>, options?: StreamPipeOptions): Promise<void>;
-  pipeThrough<U>(transform: TransformStream<T, U>): Stream<U>;
-  tee(): [ReadableStream<T>, ReadableStream<T>];
-
-  // Operators
-  map<U>(fn: (value: T) => U): Stream<U>;
-  mapAsync<U>(fn: (value: T) => Promise<U>, concurrency?: number): Stream<U>;
-  filter(predicate: (value: T) => boolean): Stream<T>;
-  tap(fn: (value: T) => void, options?: { rethrow?: boolean }): Stream<T>;
-  scan<U>(fn: (acc: U, value: T) => U, initial: U): Stream<U>;
-  expand(fn: (value: T) => T[]): Stream<T>;
-  compact(): Stream<NonNullable<T>>;
-  buffer(size: number): Stream<T[]>;
-  batch(size: number): Stream<T[]>;
-  debounce(ms: number): Stream<T>;
-  throttle(ms: number): Stream<T>;
-  take(count: number): Stream<T>;
-  takeUntil(predicate: (value: T) => boolean): Stream<T>;
-
-  // Combination
-  merge(...streams: Stream<T>[]): Stream<T>;
-  concat(stream: Stream<T>): Stream<T>;
-
-  // Consumption
-  collect(): Promise<T[]>;
-  toArray(): Promise<T[]>;
-  toResponse(init?: ResponseInit): Response;
-  toSSE(formatter?: (value: T) => string): Stream<string>;
-  subscribe(observer: Observer<T>): Subscription;
-  [Symbol.asyncIterator](): AsyncIterableIterator<T>;
-}
-```
-
-## Version History
-
-### v0.1.0 (2025)
-- ✅ Order preservation in `mapAsync` with concurrency
-- ✅ Cross-platform line ending support in SSE parser (`\r\n`, `\n`, `\r`)
-- ✅ Configurable error handling in `tap` operator
-- ✅ Improved resource management in `takeUntil`
-- ✅ Enhanced TypeScript exports with `StreamPipeOptions`
-- ✅ Full documentation for `tee()` behavior
-
-### v0.0.x (2024)
-- Initial release with core streaming functionality
-- Web Streams API foundation
-- Basic operators and transformations
+- 🏢 **Edge application developers** - First-class edge runtime support
+- 🚀 **Performance enthusiasts** - Minimal overhead, maximum throughput
+- 🎯 **Type-safety advocates** - Full TypeScript with strict types
+- 🌊 **Stream processing experts** - Advanced operators with backpressure
+- 🤖 **AI/ML engineers** - Perfect for streaming LLM responses
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
 MIT © Aid-On
 
-## Related Projects
-
-- [@aid-on/unilmp](https://github.com/Aid-On/aid-on-platform/tree/main/packages/unilmp) - Universal LLM Provider
-- [@aid-on/qwiks](https://github.com/Aid-On/aid-on-platform/tree/main/packages/qwiks) - Qwik + Streaming Integration
-
 ---
 
-Built with ❤️ for the edge computing era
+<div align="center">
+
+**Built for the edge. Designed for developers. Ready for production.**
+
+<br/>
+
+[NPM](https://www.npmjs.com/package/@aid-on/nagare) • 
+[GitHub](https://github.com/Aid-On/nagare) • 
+[Documentation](https://github.com/Aid-On/nagare#readme)
+
+</div>
