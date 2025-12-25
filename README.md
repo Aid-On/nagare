@@ -43,10 +43,10 @@ nagareStream instanceof ReadableStream; // true!
 
 #### **2. Zero-Cost Reactive Programming**
 ```typescript
-// ❌ RxJS: 100KB+ for basic streaming
+// ❌ RxJS: Large bundle size for streaming
 import { Observable, from, map, filter } from 'rxjs';
 
-// ✅ nagare: 10KB total, tree-shakeable
+// ✅ nagare: Minimal footprint, tree-shakeable
 import { stream } from '@aid-on/nagare';
 // Native performance, no wrapper objects
 ```
@@ -118,18 +118,6 @@ const s2 = stream.create((controller) => {
   controller.complete();
 });
 ```
-
-## Performance Comparison
-
-| Feature | **nagare** | RxJS | Node Streams | Most.js |
-|---------|------------|------|--------------|---------|
-| Bundle Size | **10KB** | 100KB+ | N/A (Node) | 40KB |
-| Edge Support | **Native** | Polyfill | Polyfill | Polyfill |
-| Backpressure | **Automatic** | Manual | Yes | Manual |
-| Order-preserving concurrency | **Yes** | No | No | No |
-| Direct to Response | **Yes** | No | No | No |
-| Tree-shakeable | **Yes** | Partial | No | Yes |
-| Zero dependencies | **Yes** | No | No | No |
 
 ## Real-World Edge Examples
 
@@ -230,7 +218,6 @@ MIT © Aid-On
 <br/>
 
 [NPM](https://www.npmjs.com/package/@aid-on/nagare) • 
-[GitHub](https://github.com/Aid-On/nagare) • 
-[Documentation](https://github.com/Aid-On/nagare#readme)
+[GitHub](https://github.com/Aid-On/nagare)
 
 </div>

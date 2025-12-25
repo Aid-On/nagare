@@ -43,10 +43,10 @@ nagareStream instanceof ReadableStream; // true!
 
 #### **2. ゼロコストリアクティブプログラミング**
 ```typescript
-// ❌ RxJS: 基本的なストリーミングで100KB以上
+// ❌ RxJS: 大きなバンドルサイズ
 import { Observable, from, map, filter } from 'rxjs';
 
-// ✅ nagare: 合計10KB、tree-shake可能
+// ✅ nagare: 最小限のフットプリント、tree-shake可能
 import { stream } from '@aid-on/nagare';
 // ネイティブパフォーマンス、ラッパーオブジェクトなし
 ```
@@ -118,18 +118,6 @@ const s2 = stream.create((controller) => {
   controller.complete();
 });
 ```
-
-## パフォーマンス比較
-
-| 機能 | **nagare** | RxJS | Node Streams | Most.js |
-|------|------------|------|--------------|---------|
-| バンドルサイズ | **10KB** | 100KB+ | N/A (Node) | 40KB |
-| エッジサポート | **ネイティブ** | Polyfill | Polyfill | Polyfill |
-| バックプレッシャー | **自動** | 手動 | あり | 手動 |
-| 順序保証並行処理 | **あり** | なし | なし | なし |
-| 直接Response変換 | **あり** | なし | なし | なし |
-| Tree-shake可能 | **完全対応** | 部分的 | なし | あり |
-| ゼロ依存 | **はい** | いいえ | いいえ | いいえ |
 
 ## 実世界のエッジ環境での使用例
 
@@ -230,7 +218,6 @@ MIT © Aid-On
 <br/>
 
 [NPM](https://www.npmjs.com/package/@aid-on/nagare) • 
-[GitHub](https://github.com/Aid-On/nagare) • 
-[ドキュメント](https://github.com/Aid-On/nagare#readme)
+[GitHub](https://github.com/Aid-On/nagare)
 
 </div>
