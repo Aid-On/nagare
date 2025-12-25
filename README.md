@@ -28,35 +28,25 @@ A library that makes ReadableStream a first-class citizen with reactive extensio
 
 ## Why nagare is Different
 
-### 🎯 **nagare Features**
+### **nagare Features**
 
 #### **1. Makes ReadableStream<T> the Primary Interface**
 ```typescript
-// ❌ Other libraries: Wrap streams in proprietary objects
-const rxjsStream = from(readableStream); // Observable wrapper
-const mostStream = fromReadable(readableStream); // Most.js wrapper
-
-// ✅ nagare: Stream<T> IS ReadableStream<T> + methods
+// nagare: Stream<T> IS ReadableStream<T> + methods
 const nagareStream = stream.from(readableStream); // Zero overhead
 nagareStream instanceof ReadableStream; // true! 
 ```
 
 #### **2. Zero-Cost Reactive Programming**
 ```typescript
-// ❌ RxJS: Large bundle size for streaming
-import { Observable, from, map, filter } from 'rxjs';
-
-// ✅ nagare: Minimal footprint, tree-shakeable
+// nagare: Minimal footprint, tree-shakeable
 import { stream } from '@aid-on/nagare';
 // Native performance, no wrapper objects
 ```
 
 #### **3. Built for Edge, Not Retrofitted**
 ```typescript
-// ❌ Node.js streams: Need polyfills in edge
-// ❌ RxJS: Designed for browsers, not edge workers
-
-// ✅ nagare: Native edge runtime support
+// nagare: Native edge runtime support
 export default {
   async fetch(request) {
     return stream
@@ -69,7 +59,7 @@ export default {
 
 ## Unique Features You Won't Find Elsewhere
 
-### 🚀 **Order-Preserving Concurrent Processing**
+### **Order-Preserving Concurrent Processing**
 ```typescript
 // Process 10 items concurrently but maintain order!
 const results = await stream
@@ -84,7 +74,7 @@ console.log(results); // ALWAYS [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
 // Order preserved despite concurrent execution!
 ```
 
-### 💫 **Automatic Backpressure Handling**
+### **Automatic Backpressure Handling**
 ```typescript
 // Stream automatically pauses when consumer is slow
 stream.subscribe({
@@ -95,14 +85,14 @@ stream.subscribe({
 });
 ```
 
-### 🔄 **Native SSE with Cross-Platform Line Endings**
+### **Native SSE with Cross-Platform Line Endings**
 ```typescript
 // Works with ANY server (Windows, Unix, Mac)
 const events = await stream.fromSSE('/api/events');
 // Automatically handles \r\n, \n, and \r line endings
 ```
 
-### 🎭 **Dual Interface: Reactive + Imperative**
+### **Dual Interface: Reactive + Imperative**
 ```typescript
 // Choose your style!
 
@@ -195,11 +185,11 @@ console.log(result); // [6, 8, 10]
 
 ## Who Should Use nagare?
 
-- 🏢 **Edge application developers** - First-class edge runtime support
-- 🚀 **Performance enthusiasts** - Minimal overhead, maximum throughput
-- 🎯 **Type-safety advocates** - Full TypeScript with strict types
-- 🌊 **Stream processing experts** - Advanced operators with backpressure
-- 🤖 **AI/ML engineers** - Perfect for streaming LLM responses
+- **Edge application developers** - First-class edge runtime support
+- **Performance enthusiasts** - Minimal overhead, maximum throughput
+- **Type-safety advocates** - Full TypeScript with strict types
+- **Stream processing experts** - Advanced operators with backpressure
+- **AI/ML engineers** - Perfect for streaming LLM responses
 
 ## License
 

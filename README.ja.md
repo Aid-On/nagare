@@ -28,35 +28,25 @@ ReadableStreamを第一級市民として扱うリアクティブ拡張ライブ
 
 ## nagareが特別な理由
 
-### 🎯 **nagareの特徴**
+### **nagareの特徴**
 
 #### **1. ReadableStream<T>そのものがインターフェース**
 ```typescript
-// ❌ 他のライブラリ: ストリームを独自オブジェクトでラップ
-const rxjsStream = from(readableStream); // Observable でラップ
-const mostStream = fromReadable(readableStream); // Most.js でラップ
-
-// ✅ nagare: Stream<T>はReadableStream<T> + メソッド
+// nagare: Stream<T>はReadableStream<T> + メソッド
 const nagareStream = stream.from(readableStream); // オーバーヘッドゼロ
 nagareStream instanceof ReadableStream; // true! 
 ```
 
 #### **2. ゼロコストリアクティブプログラミング**
 ```typescript
-// ❌ RxJS: 大きなバンドルサイズ
-import { Observable, from, map, filter } from 'rxjs';
-
-// ✅ nagare: 最小限のフットプリント、tree-shake可能
+// nagare: 最小限のフットプリント、tree-shake可能
 import { stream } from '@aid-on/nagare';
 // ネイティブパフォーマンス、ラッパーオブジェクトなし
 ```
 
 #### **3. エッジファースト設計**
 ```typescript
-// ❌ Node.js streams: エッジでpolyfillが必要
-// ❌ RxJS: ブラウザ向け設計、エッジワーカー非対応
-
-// ✅ nagare: ネイティブエッジランタイムサポート
+// nagare: ネイティブエッジランタイムサポート
 export default {
   async fetch(request) {
     return stream
@@ -69,7 +59,7 @@ export default {
 
 ## 他では見つからないユニーク機能
 
-### 🚀 **順序保証付き並行処理**
+### **順序保証付き並行処理**
 ```typescript
 // 10個を並行処理しても順序は保証！
 const results = await stream
@@ -84,7 +74,7 @@ console.log(results); // 必ず [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
 // 並行実行でも順序は完璧に保持！
 ```
 
-### 💫 **自動バックプレッシャー制御**
+### **自動バックプレッシャー制御**
 ```typescript
 // コンシューマーが遅い時、ストリームが自動的に一時停止
 stream.subscribe({
@@ -95,14 +85,14 @@ stream.subscribe({
 });
 ```
 
-### 🔄 **クロスプラットフォーム対応SSE**
+### **クロスプラットフォーム対応SSE**
 ```typescript
 // どんなサーバーでも動作（Windows、Unix、Mac）
 const events = await stream.fromSSE('/api/events');
 // \r\n、\n、\r すべての改行コードを自動処理
 ```
 
-### 🎭 **デュアルインターフェース: リアクティブ + 命令型**
+### **デュアルインターフェース: リアクティブ + 命令型**
 ```typescript
 // お好みのスタイルで！
 
@@ -195,11 +185,11 @@ console.log(result); // [6, 8, 10]
 
 ## nagareを使うべき人
 
-- 🏢 **エッジアプリケーション開発者** - 第一級エッジランタイムサポート
-- 🚀 **パフォーマンス重視の開発者** - 最小オーバーヘッド、最大スループット
-- 🎯 **型安全性支持者** - 厳密な型付きTypeScript
-- 🌊 **ストリーム処理のエキスパート** - バックプレッシャー付き高度オペレーター
-- 🤖 **AI/MLエンジニア** - LLMレスポンスのストリーミングに最適
+- **エッジアプリケーション開発者** - 第一級エッジランタイムサポート
+- **パフォーマンス重視の開発者** - 最小オーバーヘッド、最大スループット
+- **型安全性支持者** - 厳密な型付きTypeScript
+- **ストリーム処理のエキスパート** - バックプレッシャー付き高度オペレーター
+- **AI/MLエンジニア** - LLMレスポンスのストリーミングに最適
 
 ## ライセンス
 
