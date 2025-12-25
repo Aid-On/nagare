@@ -42,7 +42,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "benchmark": "npx tsx benchmarks/basic.ts"
+    "prepublishOnly": "npm run build && npm run test"
   },
   "dependencies": {},
   "devDependencies": {
@@ -54,14 +54,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Aid-On/aid-on-platform.git",
-    "directory": "packages/nagare"
+    "url": "git+https://github.com/Aid-On/nagare.git"
   },
-  "homepage": "https://github.com/Aid-On/aid-on-platform/tree/main/packages/nagare",
+  "homepage": "https://github.com/Aid-On/nagare#readme",
   "bugs": {
-    "url": "https://github.com/Aid-On/aid-on-platform/issues"
+    "url": "https://github.com/Aid-On/nagare/issues"
   },
-  "author": "Aid-On Platform",
+  "author": "Aid-On",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"

@@ -1,0 +1,33 @@
+# Source files
+src/
+test/
+benchmarks/
+
+# Config files
+tsconfig.json
+vitest.config.ts
+.gitignore
+.npmignore
+
+# Development files
+*.tgz
+node_modules/
+coverage/
+.vscode/
+.idea/
+
+# Git
+.git/
+.github/
+
+# Build artifacts not needed
+*.map
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep only dist, README files, and LICENSE
