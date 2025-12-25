@@ -201,10 +201,6 @@ console.log(result); // [6, 8, 10]
 - 🌊 **Stream processing experts** - Advanced operators with backpressure
 - 🤖 **AI/ML engineers** - Perfect for streaming LLM responses
 
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
 ## License
 
 MIT © Aid-On
