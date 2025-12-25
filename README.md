@@ -15,7 +15,7 @@
 
 <p align="center">
 <b>Not just another streaming library.</b><br/>
-The <i>only</i> library that makes ReadableStream a first-class citizen with reactive extensions.
+A library that makes ReadableStream a first-class citizen with reactive extensions.
 </p>
 
 <br/>
@@ -28,7 +28,7 @@ The <i>only</i> library that makes ReadableStream a first-class citizen with rea
 
 ## Why nagare is Different
 
-### 🎯 **The ONLY Library That...**
+### 🎯 **nagare Features**
 
 #### **1. Makes ReadableStream<T> the Primary Interface**
 ```typescript
