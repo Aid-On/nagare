@@ -70,22 +70,15 @@ describe('Core Review Fixes', () => {
       ).rejects.toThrow('Rethrow me');
     });
 
-    it('should log errors to console', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      await stream.array([1, 2, 3])
+    it('should silently ignore errors when rethrow is disabled', async () => {
+      const result = await stream.array([1, 2, 3])
         .tap((value) => {
           if (value === 2) throw new Error('Error at 2');
         })
         .collect();
-      
-      expect(consoleSpy).toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Stream.tap error:', 
-        expect.any(Error)
-      );
-      
-      consoleSpy.mockRestore();
+
+      // Stream should continue despite tap error, no console output
+      expect(result).toEqual([1, 2, 3]);
     });
   });
 

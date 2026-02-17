@@ -153,18 +153,7 @@ describe("Stream<T> - Edge Cases & Error Handling", () => {
       expect(errorCaught).toBe(true);
     });
 
-    it("should isolate tap errors", async () => {
-      const values: number[] = [];
-      const errors: Error[] = [];
-      
-      // Mock console.error to capture tap errors
-      const originalError = console.error;
-      console.error = vi.fn((msg: string, error: Error) => {
-        if (msg.includes('tap error')) {
-          errors.push(error);
-        }
-      });
-
+    it("should isolate tap errors silently", async () => {
       const s = stream.array([1, 2, 3])
         .tap(x => {
           if (x === 2) throw new Error("Tap error");
@@ -172,13 +161,9 @@ describe("Stream<T> - Edge Cases & Error Handling", () => {
         .map(x => x * 2);
 
       const result = await s.collect();
-      
-      // Stream should continue despite tap error
+
+      // Stream should continue despite tap error (silently ignored)
       expect(result).toEqual([2, 4, 6]);
-      expect(errors).toHaveLength(1);
-      expect(errors[0]?.message).toBe("Tap error");
-      
-      console.error = originalError;
     });
 
     it("should handle errors in merge", async () => {
@@ -295,13 +280,10 @@ describe("Stream<T> - Edge Cases & Error Handling", () => {
         return () => clearInterval(interval);
       });
 
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const result = await s.collect(100);
-      
+
+      // Should stop collecting at the specified limit
       expect(result).toHaveLength(100);
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('max items limit'));
-      
-      consoleSpy.mockRestore();
     });
   });
 
@@ -466,11 +448,9 @@ describe("Stream<T> - Edge Cases & Error Handling", () => {
     });
 
     it("should handle SSE formatter errors gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      const circularObj: any = { id: 1 };
+      const circularObj: Record<string, unknown> = { id: 1 };
       circularObj.self = circularObj; // Create circular reference
-      
+
       const s = stream.array([
         { id: 1, text: "Valid" },
         circularObj,
@@ -478,14 +458,11 @@ describe("Stream<T> - Edge Cases & Error Handling", () => {
       ]);
 
       const result = await s.toSSE().collect();
-      
-      // Should skip the circular object but continue
+
+      // Should silently skip the circular object but continue
       expect(result).toHaveLength(3); // 2 valid + done
       expect(result[0]).toContain('"id":1');
       expect(result[1]).toContain('"id":2');
-      
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
   });
 
