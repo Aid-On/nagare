@@ -3,7 +3,7 @@
  * Focus on essential features without SSE
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { stream } from '../src/index.js';
 
 describe('Core Review Fixes', () => {
@@ -121,7 +121,7 @@ describe('Core Review Fixes', () => {
       
       let errorMessage = '';
       s.subscribe({
-        next: () => {},
+        next: () => { /* no-op */ },
         error: (error) => errorMessage = error.message
       });
       

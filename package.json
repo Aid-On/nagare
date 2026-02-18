@@ -1,6 +1,6 @@
 {
   "name": "@aid-on/nagare",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Universal streaming interface built on Web Streams API for edge computing environments with reactive extensions",
   "type": "module",
   "main": "./dist/index.cjs",

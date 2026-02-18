@@ -8,6 +8,40 @@ import type { Stream } from "./types";
 import { fromReadableStream } from "./create-stream";
 
 /**
+ * Parse a single SSE data line and enqueue the parsed result.
+ * Returns true if the stream should terminate ([DONE] received).
+ */
+function parseSSEDataLine<T>(
+  dataStr: string,
+  parser: (data: string) => T,
+  controller: TransformStreamDefaultController<T>,
+): boolean {
+  if (dataStr === "[DONE]") {
+    return true;
+  }
+  if (dataStr) {
+    try {
+      const parsed = parser(dataStr);
+      controller.enqueue(parsed);
+    } catch { /* skip unparseable SSE data */ }
+  }
+  return false;
+}
+
+/**
+ * Split the buffer into complete lines, keeping any trailing incomplete line.
+ * Returns [completeLines, remainingBuffer].
+ */
+function splitSSEBuffer(buffer: string): [string[], string] {
+  const lines = buffer.split(/\r\n|\n|\r/);
+  if (!buffer.match(/(\r\n|\n|\r)$/)) {
+    const remaining = lines.pop() || "";
+    return [lines, remaining];
+  }
+  return [lines, ""];
+}
+
+/**
  * Create stream from Server-Sent Events (Edge-native SSE consumer)
  * Fluent API for SSE streaming with automatic buffering & parsing
  *
@@ -74,38 +108,19 @@ export async function fromSSE<T = unknown>(
     .pipeThrough(new TextDecoderStream())
     .pipeThrough(new TransformStream<string, T>({
       transform(chunk, controller) {
-        // Add chunk to buffer for incomplete line handling
         buffer += chunk;
-        // Support all line endings: \r\n (Windows), \n (Unix), \r (Old Mac)
-        const lines = buffer.split(/\r\n|\n|\r/);
+        const [lines, remaining] = splitSSEBuffer(buffer);
+        buffer = remaining;
 
-        // Keep last incomplete line in buffer
-        // Check if chunk ends with any line ending
-        if (!buffer.match(/(\r\n|\n|\r)$/)) {
-          buffer = lines.pop() || "";
-        } else {
-          buffer = "";
-        }
-
-        // Process complete lines
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed) continue; // Skip empty lines
+          if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
-          if (trimmed.startsWith("data: ")) {
-            const dataStr = trimmed.slice(6).trim();
-
-            if (dataStr === "[DONE]") {
-              controller.terminate();
-              return;
-            }
-
-            if (dataStr) {
-              try {
-                const parsed = parser(dataStr);
-                controller.enqueue(parsed);
-              } catch { /* skip unparseable SSE data */ }
-            }
+          const dataStr = trimmed.slice(6).trim();
+          const shouldTerminate = parseSSEDataLine(dataStr, parser, controller);
+          if (shouldTerminate) {
+            controller.terminate();
+            return;
           }
         }
       },

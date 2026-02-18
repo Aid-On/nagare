@@ -15,6 +15,54 @@ export type StreamCreateFn = <T>(setup: (controller: {
 }) => void | (() => void)) => Stream<T>;
 
 /**
+ * Flush ordered results from the buffer to the controller.
+ * Extracted to reduce complexity of buildMapAsync.
+ */
+function flushOrderedResults<U>(
+  resultBuffer: Map<number, U>,
+  outputIndex: { value: number },
+  controller: TransformStreamDefaultController<U>,
+): void {
+  while (resultBuffer.has(outputIndex.value)) {
+    const item = resultBuffer.get(outputIndex.value) as U;
+    controller.enqueue(item);
+    resultBuffer.delete(outputIndex.value);
+    outputIndex.value++;
+  }
+}
+
+/**
+ * Execute a single mapAsync task: run the async fn and buffer the result.
+ * Extracted to reduce cognitive complexity of buildMapAsync's transform.
+ */
+async function executeMapAsyncTask<T, U>(
+  chunk: T,
+  currentIndex: number,
+  fn: (value: T) => Promise<U>,
+  resultBuffer: Map<number, U>,
+  outputIndex: { value: number },
+  state: { hasErrored: boolean },
+  abortController: AbortController | undefined,
+  controller: TransformStreamDefaultController<U>,
+): Promise<void> {
+  try {
+    if (abortController?.signal.aborted) return;
+    const result = await fn(chunk);
+
+    if (!state.hasErrored && !abortController?.signal.aborted) {
+      resultBuffer.set(currentIndex, result);
+      flushOrderedResults(resultBuffer, outputIndex, controller);
+    }
+  } catch (error) {
+    if (!state.hasErrored) {
+      state.hasErrored = true;
+      abortController?.abort();
+      controller.error(error);
+    }
+  }
+}
+
+/**
  * Build mapAsync TransformStream with concurrency control,
  * error handling, and order preservation
  */
@@ -26,10 +74,10 @@ export function buildMapAsync<T, U>(
 ): Stream<U> {
   const queue: Promise<void>[] = [];
   const resultBuffer = new Map<number, U>();
-  let hasErrored = false;
+  const state = { hasErrored: false };
   let abortController: AbortController | undefined;
   let inputIndex = 0;
-  let outputIndex = 0;
+  const outputIndex = { value: 0 };
 
   const transform = new TransformStream<T, U>({
     start() {
@@ -37,54 +85,31 @@ export function buildMapAsync<T, U>(
     },
 
     async transform(chunk, controller) {
-      if (hasErrored) return;
+      if (state.hasErrored) return;
 
-      while (queue.length >= concurrency && !hasErrored) {
+      while (queue.length >= concurrency && !state.hasErrored) {
         await Promise.race(queue);
       }
 
-      if (hasErrored) return;
+      if (state.hasErrored) return;
 
       const currentIndex = inputIndex++;
 
-      const task = (async () => {
-        try {
-          if (abortController?.signal.aborted) return;
-          const result = await fn(chunk);
-
-          if (!hasErrored && !abortController?.signal.aborted) {
-            resultBuffer.set(currentIndex, result);
-
-            while (resultBuffer.has(outputIndex)) {
-              controller.enqueue(resultBuffer.get(outputIndex)!);
-              resultBuffer.delete(outputIndex);
-              outputIndex++;
-            }
-          }
-        } catch (error) {
-          if (!hasErrored) {
-            hasErrored = true;
-            abortController?.abort();
-            controller.error(error);
-          }
-        }
-      })();
+      const task = executeMapAsyncTask(
+        chunk, currentIndex, fn, resultBuffer, outputIndex,
+        state, abortController, controller,
+      );
 
       queue.push(task);
       task.finally(() => {
-        const index = queue.indexOf(task);
-        if (index > -1) queue.splice(index, 1);
+        const idx = queue.indexOf(task);
+        if (idx > -1) queue.splice(idx, 1);
       });
     },
 
     async flush(controller) {
       await Promise.allSettled(queue);
-
-      while (resultBuffer.has(outputIndex)) {
-        controller.enqueue(resultBuffer.get(outputIndex)!);
-        resultBuffer.delete(outputIndex);
-        outputIndex++;
-      }
+      flushOrderedResults(resultBuffer, outputIndex, controller);
     }
   });
   return wrapStream(readable.pipeThrough(transform));
@@ -208,6 +233,22 @@ export function buildMerge<T>(
 }
 
 /**
+ * Forward all values from an async iterable to the controller.
+ * Returns true if cancelled during iteration.
+ */
+async function forwardStream<T>(
+  source: AsyncIterable<T>,
+  controller: { next: (value: T) => void },
+  cancelledRef: { value: boolean },
+): Promise<boolean> {
+  for await (const value of source) {
+    if (cancelledRef.value) return true;
+    controller.next(value);
+  }
+  return cancelledRef.value;
+}
+
+/**
  * Build concat operation with cancellation support
  */
 export function buildConcat<T>(
@@ -217,36 +258,30 @@ export function buildConcat<T>(
   streamCreate: StreamCreateFn,
 ): Stream<T> {
   return streamCreate<T>((controller) => {
-    let cancelled = false;
+    const cancelledRef = { value: false };
 
     (async () => {
       try {
         const thisStream = wrapStream(readable);
-        for await (const value of thisStream) {
-          if (cancelled) return;
-          controller.next(value);
-        }
+        if (await forwardStream(thisStream, controller, cancelledRef)) return;
 
         for (const other of others) {
-          if (cancelled) return;
-          for await (const value of other) {
-            if (cancelled) return;
-            controller.next(value);
-          }
+          if (cancelledRef.value) return;
+          if (await forwardStream(other, controller, cancelledRef)) return;
         }
 
-        if (!cancelled) {
+        if (!cancelledRef.value) {
           controller.complete();
         }
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelledRef.value) {
           controller.error(error instanceof Error ? error : new Error(String(error)));
         }
       }
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.value = true;
     };
   });
 }

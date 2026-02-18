@@ -17,6 +17,44 @@ import {
   type StreamCreateFn,
 } from "./fluent-methods";
 
+/**
+ * Drive the read loop for a subscription, dispatching values to the observer.
+ * Extracted to reduce cognitive complexity of subscribe().
+ */
+async function driveSubscriptionReader<T>(
+  reader: ReadableStreamDefaultReader<T>,
+  subscription: { closed: boolean },
+  observer: Observer<T>,
+  activeSubscriptions: WeakSet<{ closed: boolean }>,
+): Promise<void> {
+  try {
+    while (!subscription.closed) {
+      const { done, value } = await reader.read();
+      if (done) {
+        observer.complete?.();
+        subscription.closed = true;
+        break;
+      }
+      if (subscription.closed) break;
+      if (observer.next) {
+        const result = observer.next(value);
+        if (result && typeof result.then === 'function') {
+          await result;
+        }
+      }
+    }
+  } catch (error) {
+    if (!subscription.closed) {
+      observer.error?.(
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  } finally {
+    reader.releaseLock();
+    activeSubscriptions.delete(subscription);
+  }
+}
+
 /** Lazy reference to stream.create - set by index.ts at module init */
 let _streamCreate: StreamCreateFn | undefined;
 
@@ -106,34 +144,7 @@ function createSafeStream<T>(readable: ReadableStream<T>): Stream<T> {
         };
       }
 
-      (async () => {
-        try {
-          while (!subscription.closed) {
-            const { done, value } = await reader.read();
-            if (done) {
-              observer.complete?.();
-              subscription.closed = true;
-              break;
-            }
-            if (subscription.closed) break;
-            if (observer.next) {
-              const result = observer.next(value);
-              if (result && typeof result.then === 'function') {
-                await result;
-              }
-            }
-          }
-        } catch (error) {
-          if (!subscription.closed) {
-            observer.error?.(
-              error instanceof Error ? error : new Error(String(error))
-            );
-          }
-        } finally {
-          reader.releaseLock();
-          activeSubscriptions.delete(subscription);
-        }
-      })();
+      driveSubscriptionReader(reader, subscription, observer, activeSubscriptions);
 
       return {
         unsubscribe: () => {

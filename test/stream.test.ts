@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stream, operators, fromArray, type Stream } from "../src/index.js";
+import { stream, operators } from "../src/index.js";
 
 describe("Stream<T> - Universal Interface", () => {
   describe("Web Streams integration", () => {
@@ -68,7 +68,7 @@ describe("Stream<T> - Universal Interface", () => {
     });
 
     it("should handle unsubscribe", () => {
-      const subscription = stream.array([1, 2, 3]).subscribe(() => {});
+      const subscription = stream.array([1, 2, 3]).subscribe({ next: () => { /* no-op */ } });
       
       expect(subscription.closed).toBe(false);
       subscription.unsubscribe();

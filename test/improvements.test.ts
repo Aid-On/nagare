@@ -14,7 +14,7 @@ describe('Review Improvements', () => {
       const myStream = stream.array(['hello', 'world']);
       
       // Should not throw when passed to Response
-      expect(() => new Response(myStream as any)).not.toThrow();
+      expect(() => new Response(myStream as unknown as BodyInit)).not.toThrow();
     });
     
     test('Stream methods are still accessible', () => {
@@ -130,7 +130,7 @@ describe('Review Improvements', () => {
     test('mapAsync should not produce secondary errors', async () => {
       const errors: Error[] = [];
       const originalConsoleError = console.error;
-      console.error = vi.fn((message, error) => {
+      console.error = vi.fn((_message, error) => {
         if (error instanceof Error) errors.push(error);
       });
       
@@ -172,9 +172,8 @@ describe('Review Improvements', () => {
       const resultStream = myStream.mapAsync(async (value) => {
         try {
           // Simulate async work
-          await new Promise((resolve, reject) => {
-            const timeout = setTimeout(resolve, 20);
-            // In real scenario, we'd check abortSignal here
+          await new Promise((resolve) => {
+            setTimeout(resolve, 20);
           });
           
           if (value === 3) {
@@ -184,7 +183,7 @@ describe('Review Improvements', () => {
           return value * 2;
         } catch (error) {
           // Count aborted operations
-          if ((error as any)?.name === 'AbortError') {
+          if ((error as unknown as { name?: string })?.name === 'AbortError') {
             abortedCount++;
           }
           throw error;
