@@ -6,6 +6,10 @@
  */
 
 import type { Stream } from "./types";
+import {
+  flushOrderedResults,
+  executeMapAsyncTask,
+} from "./fluent-map-async";
 
 /** Type for the stream.create factory function */
 export type StreamCreateFn = <T>(setup: (controller: {
@@ -13,54 +17,6 @@ export type StreamCreateFn = <T>(setup: (controller: {
   error: (error: Error) => void;
   complete: () => void;
 }) => void | (() => void)) => Stream<T>;
-
-/**
- * Flush ordered results from the buffer to the controller.
- * Extracted to reduce complexity of buildMapAsync.
- */
-function flushOrderedResults<U>(
-  resultBuffer: Map<number, U>,
-  outputIndex: { value: number },
-  controller: TransformStreamDefaultController<U>,
-): void {
-  while (resultBuffer.has(outputIndex.value)) {
-    const item = resultBuffer.get(outputIndex.value) as U;
-    controller.enqueue(item);
-    resultBuffer.delete(outputIndex.value);
-    outputIndex.value++;
-  }
-}
-
-/**
- * Execute a single mapAsync task: run the async fn and buffer the result.
- * Extracted to reduce cognitive complexity of buildMapAsync's transform.
- */
-async function executeMapAsyncTask<T, U>(
-  chunk: T,
-  currentIndex: number,
-  fn: (value: T) => Promise<U>,
-  resultBuffer: Map<number, U>,
-  outputIndex: { value: number },
-  state: { hasErrored: boolean },
-  abortController: AbortController | undefined,
-  controller: TransformStreamDefaultController<U>,
-): Promise<void> {
-  try {
-    if (abortController?.signal.aborted) return;
-    const result = await fn(chunk);
-
-    if (!state.hasErrored && !abortController?.signal.aborted) {
-      resultBuffer.set(currentIndex, result);
-      flushOrderedResults(resultBuffer, outputIndex, controller);
-    }
-  } catch (error) {
-    if (!state.hasErrored) {
-      state.hasErrored = true;
-      abortController?.abort();
-      controller.error(error);
-    }
-  }
-}
 
 /**
  * Build mapAsync TransformStream with concurrency control,
@@ -95,10 +51,10 @@ export function buildMapAsync<T, U>(
 
       const currentIndex = inputIndex++;
 
-      const task = executeMapAsyncTask(
+      const task = executeMapAsyncTask({
         chunk, currentIndex, fn, resultBuffer, outputIndex,
         state, abortController, controller,
-      );
+      });
 
       queue.push(task);
       task.finally(() => {
@@ -248,6 +204,42 @@ async function forwardStream<T>(
   return cancelledRef.value;
 }
 
+/** Controller interface for concat stream operations */
+interface ConcatController<T> {
+  next: (value: T) => void;
+  error: (error: Error) => void;
+  complete: () => void;
+}
+
+/**
+ * Forward all streams in sequence, respecting cancellation.
+ */
+async function concatStreams<T>(
+  streams: AsyncIterable<T>[],
+  controller: ConcatController<T>,
+  cancelledRef: { value: boolean },
+): Promise<void> {
+  for (const stream of streams) {
+    if (cancelledRef.value) return;
+    if (await forwardStream(stream, controller, cancelledRef)) return;
+  }
+  if (!cancelledRef.value) {
+    controller.complete();
+  }
+}
+
+/**
+ * Report an error to the concat controller if not cancelled.
+ */
+function reportConcatError<T>(
+  error: unknown,
+  controller: ConcatController<T>,
+  cancelledRef: { value: boolean },
+): void {
+  if (cancelledRef.value) return;
+  controller.error(error instanceof Error ? error : new Error(String(error)));
+}
+
 /**
  * Build concat operation with cancellation support
  */
@@ -259,26 +251,11 @@ export function buildConcat<T>(
 ): Stream<T> {
   return streamCreate<T>((controller) => {
     const cancelledRef = { value: false };
+    const thisStream = wrapStream(readable);
+    const allStreams: AsyncIterable<T>[] = [thisStream, ...others];
 
-    (async () => {
-      try {
-        const thisStream = wrapStream(readable);
-        if (await forwardStream(thisStream, controller, cancelledRef)) return;
-
-        for (const other of others) {
-          if (cancelledRef.value) return;
-          if (await forwardStream(other, controller, cancelledRef)) return;
-        }
-
-        if (!cancelledRef.value) {
-          controller.complete();
-        }
-      } catch (error) {
-        if (!cancelledRef.value) {
-          controller.error(error instanceof Error ? error : new Error(String(error)));
-        }
-      }
-    })();
+    concatStreams(allStreams, controller, cancelledRef)
+      .catch((error) => reportConcatError(error, controller, cancelledRef));
 
     return () => {
       cancelledRef.value = true;

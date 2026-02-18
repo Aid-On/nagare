@@ -7,6 +7,16 @@
 
 import type { StreamPipeOptions, Observer, Subscription, Stream } from "./types";
 import { operators } from "./operators";
+import { handleSubscribe } from "./stream-subscribe";
+import {
+  buildToResponse,
+  buildCollect,
+  buildReduce,
+  buildTake,
+  buildTakeUntil,
+  buildAsyncIterator,
+  buildTap,
+} from "./stream-collectors";
 import {
   buildMapAsync,
   buildDebounce,
@@ -16,44 +26,6 @@ import {
   buildToSSE,
   type StreamCreateFn,
 } from "./fluent-methods";
-
-/**
- * Drive the read loop for a subscription, dispatching values to the observer.
- * Extracted to reduce cognitive complexity of subscribe().
- */
-async function driveSubscriptionReader<T>(
-  reader: ReadableStreamDefaultReader<T>,
-  subscription: { closed: boolean },
-  observer: Observer<T>,
-  activeSubscriptions: WeakSet<{ closed: boolean }>,
-): Promise<void> {
-  try {
-    while (!subscription.closed) {
-      const { done, value } = await reader.read();
-      if (done) {
-        observer.complete?.();
-        subscription.closed = true;
-        break;
-      }
-      if (subscription.closed) break;
-      if (observer.next) {
-        const result = observer.next(value);
-        if (result && typeof result.then === 'function') {
-          await result;
-        }
-      }
-    }
-  } catch (error) {
-    if (!subscription.closed) {
-      observer.error?.(
-        error instanceof Error ? error : new Error(String(error))
-      );
-    }
-  } finally {
-    reader.releaseLock();
-    activeSubscriptions.delete(subscription);
-  }
-}
 
 /** Lazy reference to stream.create - set by index.ts at module init */
 let _streamCreate: StreamCreateFn | undefined;
@@ -112,138 +84,16 @@ function createSafeStream<T>(readable: ReadableStream<T>): Stream<T> {
     },
 
     subscribe(observer: Observer<T>): Subscription {
-      const subscription = { closed: false };
-      activeSubscriptions.add(subscription);
-      let forSubscription: ReadableStream<T>;
-      let reader: ReadableStreamDefaultReader<T>;
-
-      try {
-        if (readable.locked) {
-          const error = new Error(
-            'Cannot subscribe to locked stream. Stream may already be in use.'
-            + ' Consider using tee() to create multiple readers.'
-          );
-          observer.error?.(error);
-          activeSubscriptions.delete(subscription);
-          return {
-            unsubscribe: () => { subscription.closed = true; },
-            get closed() { return true; }
-          };
-        }
-        [forSubscription] = readable.tee();
-        reader = forSubscription.getReader();
-      } catch (e) {
-        const error = e instanceof Error
-          ? e
-          : new Error('Failed to create subscription: ' + String(e));
-        observer.error?.(error);
-        activeSubscriptions.delete(subscription);
-        return {
-          unsubscribe: () => { subscription.closed = true; },
-          get closed() { return true; }
-        };
-      }
-
-      driveSubscriptionReader(reader, subscription, observer, activeSubscriptions);
-
-      return {
-        unsubscribe: () => {
-          subscription.closed = true;
-          try { reader.releaseLock(); } catch { /* already released */ }
-        },
-        get closed() { return subscription.closed; }
-      };
+      return handleSubscribe(readable, observer, activeSubscriptions);
     },
 
-    toResponse(init?: ResponseInit): Response {
-      const uint8Stream = readable.pipeThrough(new TransformStream({
-        transform(chunk, controller) {
-          const encoder = new TextEncoder();
-          controller.enqueue(encoder.encode(String(chunk)));
-        }
-      }));
-      return new Response(uint8Stream, {
-        ...init,
-        headers: { "Content-Type": "text/plain; charset=utf-8", ...init?.headers },
-      });
-    },
-
-    async toReadableStream(): Promise<ReadableStream<T>> {
-      return readable;
-    },
-
-    async collect(maxItems: number = 10000): Promise<T[]> {
-      if (readable.locked) throw new Error('Cannot collect from locked stream');
-      const [forCollection] = readable.tee();
-      const reader = forCollection.getReader();
-      const result: T[] = [];
-      try {
-        while (result.length < maxItems) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          result.push(value);
-        }
-      } finally { reader.releaseLock(); }
-      return result;
-    },
-
-    async reduce<U>(fn: (acc: U, value: T) => U, initial: U): Promise<U> {
-      if (readable.locked) throw new Error('Cannot reduce locked stream');
-      const [forReduction] = readable.tee();
-      const reader = forReduction.getReader();
-      let accumulator = initial;
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          accumulator = fn(accumulator, value);
-        }
-      } finally { reader.releaseLock(); }
-      return accumulator;
-    },
-
-    take(count: number): Stream<T> {
-      let taken = 0;
-      const transform = new TransformStream<T, T>({
-        transform(chunk, controller) {
-          if (taken < count) {
-            controller.enqueue(chunk);
-            taken++;
-            if (taken >= count) controller.terminate();
-          }
-        }
-      });
-      return fromReadableStream(readable.pipeThrough(transform));
-    },
-
-    takeUntil(predicate: (value: T) => boolean): Stream<T> {
-      let shouldTerminate = false;
-      const transform = new TransformStream<T, T>({
-        async transform(chunk, controller) {
-          if (shouldTerminate) return;
-          if (predicate(chunk)) {
-            shouldTerminate = true;
-            controller.terminate();
-          } else {
-            controller.enqueue(chunk);
-          }
-        }
-      });
-      return fromReadableStream(readable.pipeThrough(transform));
-    },
-
-    async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-      if (readable.locked) throw new Error('Cannot iterate over locked stream');
-      const [forIteration] = readable.tee();
-      const reader = forIteration.getReader();
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          yield value;
-        }
-      } finally { reader.releaseLock(); }
-    },
+    toResponse: buildToResponse(readable),
+    toReadableStream: async (): Promise<ReadableStream<T>> => readable,
+    collect: buildCollect(readable),
+    reduce: buildReduce(readable),
+    take: buildTake(readable, fromReadableStream),
+    takeUntil: buildTakeUntil(readable, fromReadableStream),
+    [Symbol.asyncIterator]: buildAsyncIterator(readable),
 
     map<U>(fn: (value: T) => U): Stream<U> {
       return fromReadableStream(readable.pipeThrough(operators.map(fn)));
@@ -257,18 +107,7 @@ function createSafeStream<T>(readable: ReadableStream<T>): Stream<T> {
       return buildMapAsync(readable, fn, concurrency, fromReadableStream);
     },
 
-    tap(fn: (value: T) => void, options?: { rethrow?: boolean }): Stream<T> {
-      const { rethrow = false } = options || {};
-      const transform = new TransformStream<T, T>({
-        transform(chunk, controller) {
-          try { fn(chunk); } catch (error) {
-            if (rethrow) { controller.error(error); return; }
-          }
-          controller.enqueue(chunk);
-        }
-      });
-      return fromReadableStream(readable.pipeThrough(transform));
-    },
+    tap: buildTap(readable, fromReadableStream),
 
     buffer(size: number): Stream<T[]> {
       return fromReadableStream(readable.pipeThrough(operators.buffer(size)));
