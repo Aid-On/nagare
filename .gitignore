@@ -129,3 +129,5 @@ dist/
 
 # Claude
 .claude/
+# Codopsy reports
+codopsy-report.json
